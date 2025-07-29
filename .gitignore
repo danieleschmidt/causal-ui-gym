@@ -206,7 +206,6 @@ marimo/_static/
 marimo/_lsp/
 __marimo__/
 
-# Node.js
 node_modules/
 npm-debug.log*
 yarn-debug.log*
@@ -271,3 +270,39 @@ credentials/
 *.tmp
 *.temp
 .temporary/
+# Frontend build outputs
+.vite/
+*.tsbuildinfo
+
+# Storybook
+storybook-static/
+
+# Playwright
+test-results/
+playwright-report/
+playwright/.cache/
+
+# IDE files
+.vscode/
+.idea/
+*.swp
+*.swo
+
+# OS files
+.DS_Store
+Thumbs.db
+
+# JAX/ML specific
+*.ckpt
+*.pkl
+*.h5
+*.pt
+*.pth
+wandb/
+
+# Security
+*.key
+*.pem
+*.csr
+*.crt
+secrets/
