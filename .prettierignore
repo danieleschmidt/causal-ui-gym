@@ -1,0 +1,15 @@
+node_modules/
+dist/
+build/
+coverage/
+.vite/
+*.tsbuildinfo
+storybook-static/
+test-results/
+playwright-report/
+.env
+.env.*
+*.log
+package-lock.json
+yarn.lock
+pnpm-lock.yaml
