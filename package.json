@@ -1,0 +1,69 @@
+{
+  "name": "causal-ui-gym",
+  "version": "0.1.0",
+  "description": "React + JAX framework for testing LLM causal reasoning through interactive UI",
+  "main": "dist/index.js",
+  "type": "module",
+  "scripts": {
+    "dev": "vite",
+    "build": "tsc && vite build",
+    "preview": "vite preview",
+    "test": "vitest",
+    "test:ui": "vitest --ui",
+    "test:e2e": "playwright test",
+    "lint": "eslint . --ext ts,tsx --report-unused-disable-directives --max-warnings 0",
+    "lint:fix": "eslint . --ext ts,tsx --fix",
+    "typecheck": "tsc --noEmit",
+    "format": "prettier --write .",
+    "format:check": "prettier --check .",
+    "storybook": "storybook dev -p 6006",
+    "build-storybook": "storybook build"
+  },
+  "dependencies": {
+    "react": "^18.2.0",
+    "react-dom": "^18.2.0",
+    "@mui/material": "^5.15.0",
+    "@emotion/react": "^11.11.0",
+    "@emotion/styled": "^11.11.0",
+    "d3": "^7.9.0",
+    "framer-motion": "^11.0.0",
+    "recharts": "^2.12.0"
+  },
+  "devDependencies": {
+    "@types/react": "^18.2.66",
+    "@types/react-dom": "^18.2.22",
+    "@types/d3": "^7.4.3",
+    "@typescript-eslint/eslint-plugin": "^7.2.0",
+    "@typescript-eslint/parser": "^7.2.0",
+    "@vitejs/plugin-react": "^4.2.1",
+    "typescript": "^5.2.2",
+    "vite": "^5.2.0",
+    "vitest": "^1.6.0",
+    "@vitest/ui": "^1.6.0",
+    "eslint": "^8.57.0",
+    "eslint-plugin-react-hooks": "^4.6.0",
+    "eslint-plugin-react-refresh": "^0.4.6",
+    "prettier": "^3.2.5",
+    "playwright": "^1.44.0",
+    "@storybook/react": "^8.1.0",
+    "@storybook/react-vite": "^8.1.0"
+  },
+  "keywords": [
+    "causal-inference",
+    "react",
+    "jax",
+    "llm",
+    "ui-testing",
+    "causal-reasoning"
+  ],
+  "author": "Daniel Schmidt",
+  "license": "MIT",
+  "repository": {
+    "type": "git",
+    "url": "https://github.com/yourusername/causal-ui-gym.git"
+  },
+  "bugs": {
+    "url": "https://github.com/yourusername/causal-ui-gym/issues"
+  },
+  "homepage": "https://github.com/yourusername/causal-ui-gym#readme"
+}
