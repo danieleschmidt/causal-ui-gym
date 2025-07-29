@@ -1,0 +1,57 @@
+{
+  "simple_dag": {
+    "nodes": ["X", "Y", "Z"],
+    "edges": [["X", "Y"], ["Y", "Z"]],
+    "description": "Simple linear causal chain"
+  },
+  "confounded_dag": {
+    "nodes": ["X", "Y", "Z", "W"],
+    "edges": [["W", "X"], ["W", "Y"], ["X", "Y"], ["Y", "Z"]],
+    "description": "DAG with confounding variable W"
+  },
+  "supply_demand_model": {
+    "nodes": ["price", "demand", "supply", "revenue", "competitor_price"],
+    "edges": [
+      ["price", "demand"],
+      ["price", "revenue"],
+      ["demand", "revenue"],
+      ["competitor_price", "demand"],
+      ["supply", "price"]
+    ],
+    "description": "Economic supply and demand model"
+  },
+  "interventions": {
+    "price_increase": {
+      "variable": "price",
+      "value": 150,
+      "expected_effects": {
+        "demand": "decrease",
+        "revenue": "uncertain"
+      }
+    },
+    "supply_shock": {
+      "variable": "supply",
+      "value": 0.5,
+      "expected_effects": {
+        "price": "increase",
+        "demand": "decrease"
+      }
+    }
+  },
+  "causal_questions": [
+    {
+      "id": "ate_price_demand",
+      "question": "What is the average treatment effect of price on demand?",
+      "treatment": "price",
+      "outcome": "demand",
+      "ground_truth": -0.3
+    },
+    {
+      "id": "total_effect_advertising",
+      "question": "What is the total effect of advertising on revenue?",
+      "treatment": "advertising",
+      "outcome": "revenue",
+      "ground_truth": 0.15
+    }
+  ]
+}

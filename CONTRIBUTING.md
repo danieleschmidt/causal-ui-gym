@@ -1,192 +1,225 @@
 # Contributing to Causal UI Gym
 
-We welcome contributions! This guide will help you get started with contributing to the Causal UI Gym project.
+We welcome contributions! This guide will help you get started.
 
-## 🚀 Quick Start
+## 🎯 Ways to Contribute
 
-1. **Fork the repository** on GitHub
-2. **Clone your fork** locally:
-   ```bash
-   git clone https://github.com/yourusername/causal-ui-gym.git
-   cd causal-ui-gym
-   ```
-3. **Set up the development environment**:
-   ```bash
-   # Frontend dependencies
-   npm install
-   
-   # Backend dependencies
-   pip install -r requirements.txt
-   pip install -e ".[dev]"
-   
-   # Install pre-commit hooks
-   pre-commit install
-   ```
+- **Bug reports**: Found a bug? Let us know!
+- **Feature requests**: Have an idea? Share it with us!
+- **Code contributions**: Fix bugs, add features, improve documentation
+- **Documentation**: Help improve our docs and examples
+- **Testing**: Add test cases, improve test coverage
 
-## 🛠️ Development Workflow
+## 🚀 Getting Started
 
-### Making Changes
+### Prerequisites
 
-1. **Create a feature branch**:
-   ```bash
-   git checkout -b feature/your-feature-name
-   ```
+- Node.js 18+ and npm
+- Python 3.9+ and pip
+- Git
 
-2. **Make your changes** following our coding standards
+### Setup Development Environment
 
-3. **Run tests and linting**:
-   ```bash
-   # Frontend
-   npm run lint
-   npm run typecheck
-   npm test
-   
-   # Backend
-   black .
-   isort .
-   flake8
-   pytest
-   ```
+```bash
+# Fork and clone the repository
+git clone https://github.com/yourusername/causal-ui-gym.git
+cd causal-ui-gym
 
-4. **Commit your changes**:
-   ```bash
-   git add .
-   git commit -m "feat: add your feature description"
-   ```
+# Install frontend dependencies
+npm install
 
-5. **Push and create a Pull Request**
+# Install backend dependencies
+pip install -r requirements.txt
+pip install -e .
 
-### Commit Messages
+# Install pre-commit hooks
+pre-commit install
 
-We follow [Conventional Commits](https://www.conventionalcommits.org/):
+# Run tests to verify setup
+npm test
+python -m pytest
+```
 
-- `feat:` for new features
-- `fix:` for bug fixes
-- `docs:` for documentation changes
-- `style:` for formatting changes
-- `refactor:` for code refactoring
-- `test:` for adding tests
-- `chore:` for maintenance tasks
+## 📋 Development Workflow
 
-## 🎯 Areas for Contribution
+### 1. Create a Branch
 
-### High Priority
-- **New experiment templates** - Create reusable causal reasoning experiments
-- **Additional causal metrics** - Implement new metrics for LLM evaluation
-- **Performance optimizations** - Improve JAX backend efficiency
-- **Documentation improvements** - Enhance guides and API docs
+```bash
+git checkout -b feature/your-feature-name
+# or
+git checkout -b fix/bug-description
+```
 
-### Medium Priority
-- **Figma plugin enhancements** - Extend design-to-experiment workflow
-- **LLM agent implementations** - Add support for new models
-- **Testing coverage** - Expand test suite
-- **Accessibility improvements** - Enhance UI accessibility
+### 2. Make Changes
 
-### Getting Started Ideas
-- Fix typos in documentation
-- Add type annotations
-- Improve error messages
-- Add example experiments
+- Follow existing code style and conventions
+- Add tests for new functionality
+- Update documentation as needed
+- Ensure all tests pass
 
-## 📋 Pull Request Guidelines
+### 3. Commit Changes
 
-### Before Submitting
-- [ ] Code follows project style guidelines
-- [ ] Tests pass locally
-- [ ] Documentation is updated if needed
-- [ ] Commit messages follow conventional format
-- [ ] No merge conflicts with main branch
+We use [Conventional Commits](https://conventionalcommits.org/):
 
-### PR Template
-When creating a PR, please include:
+```bash
+git commit -m "feat: add causal graph visualization component"
+git commit -m "fix: resolve intervention tracking bug"
+git commit -m "docs: update API documentation"
+```
 
-1. **Description** - What does this PR do?
-2. **Motivation** - Why is this change needed?
-3. **Testing** - How was this tested?
-4. **Screenshots** - For UI changes
-5. **Breaking Changes** - Any backwards compatibility issues?
+### 4. Submit Pull Request
+
+- Push your branch to your fork
+- Create a pull request with clear description
+- Link any related issues
+- Ensure CI passes
+
+## 🏗️ Project Structure
+
+```
+causal-ui-gym/
+├── src/                    # Frontend React components
+├── backend/                # Python JAX backend
+├── tests/                  # Test files
+├── docs/                   # Documentation
+├── examples/               # Example experiments
+└── figma-plugin/          # Figma integration
+```
 
 ## 🧪 Testing
 
-### Frontend Testing
+### Frontend Tests
+
 ```bash
-# Unit tests
+# Run all tests
 npm test
 
-# E2E tests
+# Run tests in watch mode
+npm run test:watch
+
+# Run with coverage
+npm run test:coverage
+
+# Run E2E tests
 npm run test:e2e
-
-# Visual regression tests
-npm run test:visual
 ```
 
-### Backend Testing
+### Backend Tests
+
 ```bash
-# Unit tests
-pytest
+# Run Python tests
+python -m pytest
 
-# Coverage
-pytest --cov=causal_ui_gym
+# Run with coverage
+python -m pytest --cov=causal_ui_gym
 
-# Integration tests
-pytest tests/integration/
+# Run specific test file
+python -m pytest tests/test_causal_engine.py
 ```
 
-## 📝 Documentation
+## 📝 Code Style
 
-### Code Documentation
-- Use TypeScript types for all frontend code
-- Add docstrings to Python functions
-- Include inline comments for complex logic
-- Update README when adding features
+### Frontend (TypeScript/React)
 
-### API Documentation
-- Update OpenAPI specs for backend changes
-- Add Storybook stories for new components
-- Include usage examples in docstrings
+- Use TypeScript for all new code
+- Follow existing component patterns
+- Use functional components with hooks
+- Add prop types and documentation
 
-## 🔒 Security
+```typescript
+interface CausalGraphProps {
+  nodes: CausalNode[]
+  edges: CausalEdge[]
+  onIntervene?: (node: string, value: number) => void
+}
 
-### Reporting Vulnerabilities
-- **DO NOT** create public issues for security vulnerabilities
-- Email security concerns to: security@causal-ui-gym.dev
-- Include detailed reproduction steps
+export function CausalGraph({ nodes, edges, onIntervene }: CausalGraphProps) {
+  // Component implementation
+}
+```
 
-### Security Guidelines
-- Never commit secrets or API keys
-- Use environment variables for configuration
-- Validate all user inputs
-- Follow OWASP guidelines for web security
+### Backend (Python)
+
+- Follow PEP 8 style guidelines
+- Use type hints for all functions
+- Add docstrings for public APIs
+- Use JAX for numerical computations
+
+```python
+def compute_intervention(
+    dag: CausalDAG, 
+    intervention: Dict[str, float],
+    evidence: Dict[str, float]
+) -> Dict[str, float]:
+    """Compute intervention effects using do-calculus.
+    
+    Args:
+        dag: Causal directed acyclic graph
+        intervention: Variables to intervene on
+        evidence: Observed evidence
+        
+    Returns:
+        Posterior distribution after intervention
+    """
+    # Implementation
+```
+
+## 🐛 Bug Reports
+
+When reporting bugs, please include:
+
+- Clear description of the issue
+- Steps to reproduce
+- Expected vs actual behavior
+- Environment details (OS, Node.js version, etc.)
+- Screenshots if applicable
+
+Use our [bug report template](.github/ISSUE_TEMPLATE/bug_report.md).
+
+## 💡 Feature Requests
+
+For feature requests, please provide:
+
+- Clear description of the feature
+- Use case and motivation
+- Possible implementation approach
+- Any related examples or references
+
+## 📚 Documentation
+
+- Update README.md for significant changes
+- Add JSDoc comments for TypeScript functions
+- Add docstrings for Python functions
+- Update API documentation
+- Add examples for new features
+
+## 🔄 Release Process
+
+1. Version bump following [Semantic Versioning](https://semver.org/)
+2. Update CHANGELOG.md
+3. Create release PR
+4. Tag release after merge
+5. Automated deployment to npm and PyPI
+
+## 🤝 Community Guidelines
+
+- Be respectful and inclusive
+- Help others learn and grow
+- Provide constructive feedback
+- Follow our [Code of Conduct](CODE_OF_CONDUCT.md)
 
 ## 📞 Getting Help
 
-### Community Channels
-- **GitHub Discussions** - For questions and ideas
-- **Discord** - Real-time chat ([invite link](https://discord.gg/causal-ui))
-- **Issues** - Bug reports and feature requests
+- **Discord**: Join our [community server](https://discord.gg/causal-ui)
+- **GitHub Discussions**: For questions and ideas
+- **Issues**: For bug reports and feature requests
+- **Email**: causal-ui@yourdomain.com
 
-### Maintainer Contact
-- **GitHub**: [@danieleschmidt](https://github.com/danieleschmidt)
-- **Email**: daniel@causal-ui-gym.dev
-
-## 🎉 Recognition
+## 🏆 Recognition
 
 Contributors are recognized in:
-- README contributors section
+- README.md contributors section
 - Release notes
 - Annual contributor spotlight
-- Conference presentation acknowledgments
 
-### Contributor Levels
-- **First-time contributor** - Welcome package
-- **Regular contributor** - Project stickers
-- **Core contributor** - Direct maintainer access
-- **Major contributor** - Conference speaking opportunities
-
-## 📄 License
-
-By contributing, you agree that your contributions will be licensed under the MIT License.
-
-## ✨ Thank You!
-
-Every contribution, no matter how small, helps make Causal UI Gym better for everyone. We appreciate your time and effort! 🙏
+Thank you for contributing to Causal UI Gym! 🎉
