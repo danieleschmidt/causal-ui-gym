@@ -205,3 +205,69 @@ cython_debug/
 marimo/_static/
 marimo/_lsp/
 __marimo__/
+
+# Node.js
+node_modules/
+npm-debug.log*
+yarn-debug.log*
+yarn-error.log*
+pnpm-debug.log*
+lerna-debug.log*
+
+# Build outputs
+dist/
+out/
+.next/
+.nuxt/
+storybook-static/
+
+# Cache directories
+.cache/
+.parcel-cache/
+.eslintcache
+
+# Environment variables (already covered above)
+# Testing
+test-results/
+playwright-report/
+playwright/.cache/
+.nyc_output/
+*.lcov
+
+# OS specific
+.DS_Store
+.DS_Store?
+._*
+.Spotlight-V100
+.Trashes
+ehthumbs.db
+Thumbs.db
+
+# IDE files (additional)
+.idea/
+*.swp
+*.swo
+*~
+
+# JAX/ML specific
+data/
+*.h5
+*.pkl
+*.joblib
+wandb/
+mlruns/
+.neptune/
+.cuda/
+*.cuda
+.nvidia/
+
+# Security
+*.pem
+*.key
+.secrets/
+credentials/
+
+# Temporary files
+*.tmp
+*.temp
+.temporary/
