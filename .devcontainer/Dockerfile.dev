@@ -1,0 +1,68 @@
+# Development container for Causal UI Gym
+FROM mcr.microsoft.com/devcontainers/python:3.11-bullseye
+
+# Install Node.js
+RUN curl -fsSL https://deb.nodesource.com/setup_20.x | bash - \
+    && apt-get install -y nodejs
+
+# Install additional development tools
+RUN apt-get update && apt-get install -y \
+    git \
+    curl \
+    wget \
+    vim \
+    nano \
+    htop \
+    tree \
+    jq \
+    zip \
+    unzip \
+    build-essential \
+    && rm -rf /var/lib/apt/lists/*
+
+# Install JAX with CPU support for development
+RUN pip install --upgrade pip \
+    && pip install jax[cpu] jaxlib
+
+# Install Python development tools
+RUN pip install \
+    black \
+    isort \
+    flake8 \
+    mypy \
+    pytest \
+    pytest-asyncio \
+    pytest-cov \
+    pre-commit \
+    bandit \
+    safety
+
+# Install global npm packages for development
+RUN npm install -g \
+    typescript \
+    @types/node \
+    eslint \
+    prettier \
+    @playwright/test \
+    @storybook/cli
+
+# Set up zsh and oh-my-zsh for better development experience
+USER vscode
+RUN sh -c "$(wget -O- https://github.com/deluan/zsh-in-docker/releases/download/v1.1.5/zsh-in-docker.sh)" -- \
+    -t robbyrussell \
+    -p git \
+    -p ssh-agent \
+    -p 'history-substring-search' \
+    -a 'bindkey "\$terminfo[kcuu1]" history-substring-search-up' \
+    -a 'bindkey "\$terminfo[kcud1]" history-substring-search-down'
+
+# Create workspace directory
+USER root
+RUN mkdir -p /workspace && chown vscode:vscode /workspace
+
+# Switch back to vscode user
+USER vscode
+WORKDIR /workspace
+
+# Set default shell to zsh
+ENV SHELL=/bin/zsh
