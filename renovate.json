@@ -1,0 +1,142 @@
+{
+  "$schema": "https://docs.renovatebot.com/renovate-schema.json",
+  "description": "Renovate configuration for Causal UI Gym - Advanced dependency management",
+  "extends": [
+    "config:recommended",
+    "security:openssf-scorecard",
+    ":semanticCommits",
+    ":dependencyDashboard",
+    ":gitSignOff"
+  ],
+  "timezone": "America/New_York",
+  "schedule": ["before 6am on monday"],
+  "prConcurrentLimit": 5,
+  "branchConcurrentLimit": 10,
+  "labels": ["dependencies", "renovate"],
+  "reviewers": ["danieleschmidt"],
+  "assignees": ["danieleschmidt"],
+  "commitMessagePrefix": "deps:",
+  "commitMessageAction": "update",
+  "commitMessageTopic": "{{depName}}",
+  "commitMessageExtra": "to {{newVersion}}",
+  "prTitle": "deps: update {{depName}} to {{newVersion}}",
+  "prBodyTemplate": "This PR updates {{depName}} from {{currentVersion}} to {{newVersion}}.\n\n{{#if hasReleaseNotes}}\n## Release Notes\n{{releaseNotes}}\n{{/if}}\n\n{{#if vulnerabilityAlert}}\n## Security Advisory\n{{vulnerabilityAlert}}\n{{/if}}\n\n---\n\n🤖 This PR was generated automatically by Renovate Bot",
+  "rangeStrategy": "bump",
+  "semanticCommits": "enabled",
+  "dependencyDashboard": true,
+  "dependencyDashboardAutoclose": true,
+  "separateMajorMinor": true,
+  "separateMultipleMajor": true,
+  "separateMinorPatch": false,
+  "ignoreTests": false,
+  "respectLatest": true,
+  "stabilityDays": 3,
+  "packageRules": [
+    {
+      "description": "Group React ecosystem updates",
+      "groupName": "React ecosystem",
+      "matchPackagePatterns": ["^react", "^@types/react"],
+      "schedule": ["before 6am on monday"],
+      "automerge": false
+    },
+    {
+      "description": "Group testing framework updates",
+      "groupName": "Testing frameworks",
+      "matchPackagePatterns": ["vitest", "playwright", "@testing-library", "jest"],
+      "schedule": ["before 6am on tuesday"],
+      "automerge": false
+    },
+    {
+      "description": "Group build tools",
+      "groupName": "Build tools",
+      "matchPackagePatterns": ["vite", "@vitejs", "typescript", "eslint", "prettier"],
+      "schedule": ["before 6am on wednesday"],
+      "automerge": false
+    },
+    {
+      "description": "Group JAX ecosystem - careful updates",
+      "groupName": "JAX ecosystem",
+      "matchPackagePatterns": ["jax"],
+      "schedule": ["before 6am on monday"],
+      "automerge": false,
+      "stabilityDays": 7,
+      "prPriority": 10
+    },
+    {
+      "description": "Group LLM libraries - breaking changes likely",
+      "groupName": "LLM libraries",
+      "matchPackageNames": ["openai", "anthropic"],
+      "automerge": false,
+      "stabilityDays": 5,
+      "reviewersFromCodeOwners": true
+    },
+    {
+      "description": "Causal inference libraries - domain critical",
+      "groupName": "Causal inference",
+      "matchPackagePatterns": ["causal", "pgmpy", "dowhy"],
+      "automerge": false,
+      "stabilityDays": 7,
+      "prPriority": 10
+    },
+    {
+      "description": "Security patches - high priority",
+      "matchCurrentVersion": "!/^0/",
+      "matchUpdateTypes": ["patch"],
+      "automerge": true,
+      "automergeType": "branch",
+      "requiredStatusChecks": null,
+      "schedule": ["at any time"],
+      "prPriority": 15,
+      "labels": ["security", "automerge"]
+    },
+    {
+      "description": "Dev dependencies - lower priority",
+      "matchDepTypes": ["devDependencies"],
+      "automerge": true,
+      "automergeType": "branch",
+      "matchUpdateTypes": ["patch", "minor"],
+      "schedule": ["before 6am on friday"],
+      "prPriority": 5
+    },
+    {
+      "description": "Docker base images - security focused",
+      "matchDatasources": ["docker"],
+      "matchUpdateTypes": ["major", "minor", "patch"],
+      "automerge": false,
+      "schedule": ["before 6am on saturday"],
+      "prPriority": 8
+    },
+    {
+      "description": "GitHub Actions - stable updates",
+      "matchDatasources": ["github-actions"],
+      "pinDigests": true,
+      "automerge": true,
+      "automergeType": "branch",
+      "matchUpdateTypes": ["patch", "minor"],
+      "schedule": ["before 6am on sunday"]
+    }
+  ],
+  "vulnerabilityAlerts": {
+    "enabled": true,
+    "schedule": ["at any time"],
+    "prPriority": 20,
+    "labels": ["security", "vulnerability"],
+    "automerge": true,
+    "automergeType": "branch"
+  },
+  "osvVulnerabilityAlerts": true,
+  "lockFileMaintenance": {
+    "enabled": true,
+    "schedule": ["before 6am on saturday"],
+    "commitMessageAction": "refresh",
+    "prTitle": "deps: refresh lock files",
+    "automerge": true,
+    "automergeType": "branch"
+  },
+  "npm": {
+    "minimumReleaseAge": "3 days"
+  },
+  "python": {
+    "minimumReleaseAge": "3 days"
+  }
+}
