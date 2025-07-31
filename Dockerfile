@@ -1,5 +1,5 @@
 # Multi-stage build for production optimization
-FROM node:20-alpine AS frontend-builder
+FROM node:24-alpine AS frontend-builder
 
 # Set working directory
 WORKDIR /app
