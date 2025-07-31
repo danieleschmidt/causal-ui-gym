@@ -1,0 +1,165 @@
+groups:
+  - name: causal-ui-gym-alerts
+    rules:
+      # High-level system alerts
+      - alert: HighCPUUsage
+        expr: 100 - (avg by(instance) (irate(node_cpu_seconds_total{mode="idle"}[5m])) * 100) > 80
+        for: 5m
+        labels:
+          severity: warning
+          service: system
+        annotations:
+          summary: "High CPU usage detected"
+          description: "CPU usage is above 80% for more than 5 minutes on {{ $labels.instance }}"
+
+      - alert: HighMemoryUsage
+        expr: (node_memory_MemTotal_bytes - node_memory_MemAvailable_bytes) / node_memory_MemTotal_bytes * 100 > 85
+        for: 5m
+        labels:
+          severity: warning
+          service: system
+        annotations:
+          summary: "High memory usage detected"
+          description: "Memory usage is above 85% on {{ $labels.instance }}"
+
+      - alert: DiskSpaceLow
+        expr: (node_filesystem_avail_bytes{mountpoint="/"} / node_filesystem_size_bytes{mountpoint="/"}) * 100 < 10
+        for: 2m
+        labels:
+          severity: critical
+          service: system
+        annotations:
+          summary: "Low disk space"
+          description: "Disk space is below 10% on {{ $labels.instance }}"
+
+  - name: causal-application-alerts
+    rules:
+      # Application-specific alerts
+      - alert: CausalComputationLatencyHigh
+        expr: histogram_quantile(0.95, rate(causal_computation_duration_seconds_bucket[5m])) > 2.0
+        for: 3m
+        labels:
+          severity: warning
+          service: causal-backend
+        annotations:
+          summary: "High causal computation latency"
+          description: "95th percentile latency for causal computations is above 2 seconds"
+
+      - alert: JAXBackendDown
+        expr: up{job="jax-backend"} == 0
+        for: 1m
+        labels:
+          severity: critical
+          service: jax-backend
+        annotations:
+          summary: "JAX backend is down"
+          description: "JAX backend service is not responding"
+
+      - alert: FrontendErrorRateHigh
+        expr: rate(frontend_errors_total[5m]) > 0.1
+        for: 2m
+        labels:
+          severity: warning
+          service: frontend
+        annotations:
+          summary: "High frontend error rate"
+          description: "Frontend error rate is above 10% for the last 5 minutes"
+
+      - alert: CausalGraphCreationFailures
+        expr: rate(causal_graph_creation_failures_total[5m]) > 0.05
+        for: 2m
+        labels:
+          severity: warning
+          service: causal-backend
+        annotations:
+          summary: "Causal graph creation failures"
+          description: "Causal graph creation failure rate is above 5%"
+
+  - name: performance-alerts
+    rules:
+      # Performance-related alerts
+      - alert: ReactRenderTimeHigh
+        expr: histogram_quantile(0.95, rate(react_render_duration_seconds_bucket[5m])) > 0.1
+        for: 3m
+        labels:
+          severity: warning
+          service: frontend
+        annotations:
+          summary: "High React render time"
+          description: "95th percentile React render time is above 100ms"
+
+      - alert: BundleSizeIncreased
+        expr: increase(bundle_size_bytes[1h]) > 50000
+        for: 0m
+        labels:
+          severity: info
+          service: frontend
+        annotations:
+          summary: "Bundle size increased significantly"
+          description: "Bundle size increased by more than 50KB in the last hour"
+
+      - alert: MemoryLeakDetected
+        expr: increase(process_resident_memory_bytes{job="jax-backend"}[1h]) > 100000000  # 100MB
+        for: 0m
+        labels:
+          severity: warning
+          service: jax-backend
+        annotations:
+          summary: "Potential memory leak detected"
+          description: "JAX backend memory usage increased by more than 100MB in 1 hour"
+
+  - name: security-alerts
+    rules:
+      # Security-related alerts
+      - alert: UnusualTrafficPattern
+        expr: rate(http_requests_total[5m]) > 1000
+        for: 2m
+        labels:
+          severity: warning
+          service: security
+        annotations:
+          summary: "Unusual traffic pattern detected"
+          description: "Request rate is unusually high (>1000 req/min)"
+
+      - alert: AuthenticationFailures
+        expr: rate(authentication_failures_total[5m]) > 10
+        for: 1m
+        labels:
+          severity: warning
+          service: security
+        annotations:
+          summary: "High authentication failure rate"
+          description: "Authentication failure rate is above 10/minute"
+
+  - name: data-quality-alerts
+    rules:
+      # Data quality and causal inference alerts
+      - alert: CausalInferenceAccuracyLow
+        expr: causal_inference_accuracy_ratio < 0.7
+        for: 5m
+        labels:
+          severity: warning
+          service: causal-backend
+        annotations:
+          summary: "Low causal inference accuracy"
+          description: "Causal inference accuracy is below 70%"
+
+      - alert: DataValidationFailures
+        expr: rate(data_validation_failures_total[5m]) > 0.1
+        for: 2m
+        labels:
+          severity: warning
+          service: data-processing
+        annotations:
+          summary: "High data validation failure rate"
+          description: "Data validation failure rate is above 10%"
+
+      - alert: MissingDataThresholdExceeded
+        expr: missing_data_percentage > 15
+        for: 1m
+        labels:
+          severity: warning
+          service: data-processing
+        annotations:
+          summary: "High percentage of missing data"
+          description: "Missing data percentage is above 15%"

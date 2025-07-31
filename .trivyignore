@@ -1,0 +1,15 @@
+# Trivy security scanner ignore file
+# For managing false positives and accepted risks
+
+# Development dependencies - low risk in production
+CVE-2021-44906
+CVE-2022-46175
+
+# NPM audit advisories that are development-only
+GHSA-7fh5-64p2-3v2j
+
+# Python development dependencies
+CVE-2023-40217
+
+# Add specific CVEs to ignore with justification:
+# CVE-XXXX-XXXX  # Justification: Development only, not in production

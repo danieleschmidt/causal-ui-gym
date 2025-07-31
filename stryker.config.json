@@ -1,0 +1,58 @@
+{
+  "$schema": "./node_modules/@stryker-mutator/core/schema/stryker-schema.json",
+  "packageManager": "npm",
+  "reporters": ["html", "clear-text", "progress", "json"],
+  "testRunner": "vitest",
+  "coverageAnalysis": "perTest",
+  "vitest": {
+    "configFile": "vitest.mutation.config.ts"
+  },
+  
+  "mutate": [
+    "src/**/*.ts",
+    "src/**/*.tsx",
+    "!src/**/*.test.ts",
+    "!src/**/*.test.tsx",
+    "!src/**/*.spec.ts",
+    "!src/**/*.spec.tsx",
+    "!src/test/**/*",
+    "!src/**/*.d.ts"
+  ],
+  
+  "thresholds": {
+    "high": 90,
+    "low": 70,
+    "break": 60
+  },
+  
+  "plugins": [
+    "@stryker-mutator/vitest-runner"
+  ],
+  
+  "htmlReporter": {
+    "baseDir": "reports/mutation/html"
+  },
+  
+  "jsonReporter": {
+    "fileName": "reports/mutation/mutation-report.json"
+  },
+  
+  "timeoutMS": 60000,
+  "timeoutFactor": 1.5,
+  
+  "concurrency": 2,
+  
+  "mutator": {
+    "plugins": ["typescript"],
+    "excludedMutations": [
+      "StringLiteral",
+      "LogicalOperator"
+    ]
+  },
+  
+  "dashboard": {
+    "project": "github.com/yourusername/causal-ui-gym",
+    "version": "main",
+    "module": "causal-ui-gym"
+  }
+}
