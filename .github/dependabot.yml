@@ -1,0 +1,157 @@
+# Dependabot configuration for automated dependency updates
+# This file configures Dependabot to automatically check for and create PRs for dependency updates
+
+version: 2
+updates:
+  # Frontend dependencies (npm)
+  - package-ecosystem: "npm"
+    directory: "/"
+    schedule:
+      interval: "daily"
+      time: "06:00"
+      timezone: "America/New_York"
+    open-pull-requests-limit: 5
+    reviewers:
+      - "danieleschmidt"
+    assignees:
+      - "danieleschmidt"
+    commit-message:
+      prefix: "deps"
+      prefix-development: "deps-dev"
+      include: "scope"
+    labels:
+      - "dependencies"
+      - "automated"
+    ignore:
+      # Ignore major version updates for stability
+      - dependency-name: "*"
+        update-types: ["version-update:semver-major"]
+    groups:
+      # Group React ecosystem updates
+      react-ecosystem:
+        patterns:
+          - "react*"
+          - "@types/react*"
+      # Group testing utilities
+      testing-tools:
+        patterns:
+          - "*jest*"
+          - "*vitest*"
+          - "*playwright*"
+          - "@testing-library/*"
+      # Group build tools
+      build-tools:
+        patterns:
+          - "vite*"
+          - "@vitejs/*"
+          - "typescript"
+          - "eslint*"
+          - "prettier"
+      # Group D3 ecosystem
+      visualization:
+        patterns:
+          - "d3*"
+          - "@types/d3*"
+          - "recharts"
+
+  # Python dependencies
+  - package-ecosystem: "pip"
+    directory: "/"
+    schedule:
+      interval: "daily"
+      time: "06:00"
+      timezone: "America/New_York"
+    open-pull-requests-limit: 3
+    reviewers:
+      - "danieleschmidt"
+    assignees:
+      - "danieleschmidt"
+    commit-message:
+      prefix: "deps(python)"
+      include: "scope"
+    labels:
+      - "dependencies"
+      - "python"
+      - "automated"
+    ignore:
+      # JAX updates need careful testing
+      - dependency-name: "jax*"
+        update-types: ["version-update:semver-major"]
+      # ML libraries major updates
+      - dependency-name: "numpy"
+        update-types: ["version-update:semver-major"]
+    groups:
+      # Group JAX ecosystem
+      jax-ecosystem:
+        patterns:
+          - "jax*"
+      # Group FastAPI ecosystem
+      api-framework:
+        patterns:
+          - "fastapi"
+          - "uvicorn*"
+          - "pydantic*"
+      # Group causal inference libraries
+      causal-ml:
+        patterns:
+          - "*causal*"
+          - "pgmpy"
+          - "dowhy"
+      # Group LLM libraries
+      llm-tools:
+        patterns:
+          - "openai"
+          - "anthropic"
+      # Group testing tools
+      python-testing:
+        patterns:
+          - "pytest*"
+          - "coverage"
+          - "bandit"
+
+  # Docker dependencies
+  - package-ecosystem: "docker"
+    directory: "/"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+      time: "06:00"
+    open-pull-requests-limit: 2
+    reviewers:
+      - "danieleschmidt"
+    commit-message:
+      prefix: "deps(docker)"
+    labels:
+      - "dependencies"
+      - "docker"
+      - "automated"
+
+  # GitHub Actions dependencies
+  - package-ecosystem: "github-actions"
+    directory: "/.github/workflows"
+    schedule:
+      interval: "weekly"
+      day: "monday"
+      time: "06:00"
+    open-pull-requests-limit: 3
+    reviewers:
+      - "danieleschmidt"
+    commit-message:
+      prefix: "deps(actions)"
+    labels:
+      - "dependencies"
+      - "github-actions"
+      - "automated"
+    groups:
+      # Group setup actions
+      setup-actions:
+        patterns:
+          - "actions/setup-*"
+          - "actions/checkout"
+          - "actions/cache"
+      # Group security actions
+      security-actions:
+        patterns:
+          - "github/codeql-action*"
+          - "securecodewarrior/*"
+          - "snyk/*"
