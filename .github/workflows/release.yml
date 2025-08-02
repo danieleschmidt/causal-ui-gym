@@ -1,0 +1,484 @@
+name: Release
+
+on:
+  push:
+    tags:
+      - 'v*'
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Version to release (e.g., v1.2.3)'
+        required: true
+        type: string
+      pre_release:
+        description: 'Mark as pre-release'
+        required: false
+        default: false
+        type: boolean
+      draft:
+        description: 'Create as draft release'
+        required: false
+        default: false
+        type: boolean
+
+env:
+  NODE_VERSION: "20"
+  PYTHON_VERSION: "3.11"
+
+jobs:
+  validate-release:
+    name: Validate Release
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.version.outputs.version }}
+      is-prerelease: ${{ steps.version.outputs.is-prerelease }}
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Extract version information
+        id: version
+        run: |
+          if [[ "${{ github.event_name }}" == "workflow_dispatch" ]]; then
+            VERSION="${{ inputs.version }}"
+            IS_PRERELEASE="${{ inputs.pre_release }}"
+          else
+            VERSION="${{ github.ref_name }}"
+            # Check if this is a pre-release version (contains alpha, beta, rc)
+            if [[ "$VERSION" =~ (alpha|beta|rc) ]]; then
+              IS_PRERELEASE="true"
+            else
+              IS_PRERELEASE="false"
+            fi
+          fi
+          
+          echo "version=$VERSION" >> $GITHUB_OUTPUT
+          echo "is-prerelease=$IS_PRERELEASE" >> $GITHUB_OUTPUT
+          
+          echo "🏷️ Version: $VERSION"
+          echo "🚀 Pre-release: $IS_PRERELEASE"
+
+      - name: Validate version format
+        run: |
+          VERSION="${{ steps.version.outputs.version }}"
+          if [[ ! "$VERSION" =~ ^v[0-9]+\.[0-9]+\.[0-9]+(-.*)?$ ]]; then
+            echo "❌ Invalid version format: $VERSION"
+            echo "Expected format: vX.Y.Z or vX.Y.Z-suffix"
+            exit 1
+          fi
+          echo "✅ Version format is valid"
+
+      - name: Check if tag exists
+        run: |
+          VERSION="${{ steps.version.outputs.version }}"
+          if git tag -l | grep -q "^$VERSION$"; then
+            echo "⚠️ Tag $VERSION already exists"
+            if [[ "${{ github.event_name }}" == "workflow_dispatch" ]]; then
+              echo "❌ Cannot create release for existing tag"
+              exit 1
+            fi
+          else
+            echo "✅ Tag $VERSION is new"
+          fi
+
+  build-and-test:
+    name: Build and Test
+    runs-on: ubuntu-latest
+    needs: validate-release
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+
+      - name: Setup Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          cache: 'pip'
+
+      - name: Install dependencies
+        run: |
+          npm ci
+          pip install --upgrade pip
+          pip install -r requirements.txt
+
+      - name: Run comprehensive tests
+        run: |
+          npm run lint
+          npm run typecheck
+          npm run test
+          pytest --cov=. --cov-report=xml
+
+      - name: Build application
+        run: npm run build
+
+      - name: Verify build artifacts
+        run: |
+          ls -la dist/
+          test -f dist/index.html
+          echo "✅ Build artifacts verified"
+
+  generate-changelog:
+    name: Generate Changelog
+    runs-on: ubuntu-latest
+    needs: validate-release
+    outputs:
+      changelog: ${{ steps.changelog.outputs.changelog }}
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Generate changelog
+        id: changelog
+        run: |
+          VERSION="${{ needs.validate-release.outputs.version }}"
+          
+          # Get the previous tag
+          PREVIOUS_TAG=$(git describe --tags --abbrev=0 HEAD^ 2>/dev/null || echo "")
+          
+          if [[ -z "$PREVIOUS_TAG" ]]; then
+            echo "🎉 Initial release"
+            CHANGELOG="## Initial Release\n\nThis is the first release of Causal UI Gym."
+          else
+            echo "📝 Generating changelog from $PREVIOUS_TAG to $VERSION"
+            
+            # Generate changelog using git log
+            CHANGELOG="## Changes\n\n"
+            
+            # Get commits since last tag
+            COMMITS=$(git log --pretty=format:"- %s (%h)" $PREVIOUS_TAG..HEAD)
+            
+            if [[ -n "$COMMITS" ]]; then
+              CHANGELOG="${CHANGELOG}${COMMITS}\n\n"
+            fi
+            
+            # Categorize changes
+            FEATURES=$(git log --pretty=format:"- %s (%h)" $PREVIOUS_TAG..HEAD --grep="feat:" --grep="feature:")
+            FIXES=$(git log --pretty=format:"- %s (%h)" $PREVIOUS_TAG..HEAD --grep="fix:" --grep="bugfix:")
+            DOCS=$(git log --pretty=format:"- %s (%h)" $PREVIOUS_TAG..HEAD --grep="docs:")
+            
+            if [[ -n "$FEATURES" ]]; then
+              CHANGELOG="${CHANGELOG}### 🎉 New Features\n${FEATURES}\n\n"
+            fi
+            
+            if [[ -n "$FIXES" ]]; then
+              CHANGELOG="${CHANGELOG}### 🐛 Bug Fixes\n${FIXES}\n\n"
+            fi
+            
+            if [[ -n "$DOCS" ]]; then
+              CHANGELOG="${CHANGELOG}### 📚 Documentation\n${DOCS}\n\n"
+            fi
+          fi
+          
+          # Save changelog to output
+          echo "changelog<<EOF" >> $GITHUB_OUTPUT
+          echo -e "$CHANGELOG" >> $GITHUB_OUTPUT
+          echo "EOF" >> $GITHUB_OUTPUT
+
+  build-packages:
+    name: Build Release Packages
+    runs-on: ubuntu-latest
+    needs: [validate-release, build-and-test]
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+          registry-url: 'https://registry.npmjs.org'
+
+      - name: Setup Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+          cache: 'pip'
+
+      - name: Install dependencies
+        run: |
+          npm ci
+          pip install --upgrade pip
+          pip install build twine
+
+      - name: Update version in package.json
+        run: |
+          VERSION="${{ needs.validate-release.outputs.version }}"
+          # Remove 'v' prefix for npm version
+          NPM_VERSION="${VERSION#v}"
+          npm version $NPM_VERSION --no-git-tag-version
+          echo "📦 Updated package.json version to $NPM_VERSION"
+
+      - name: Build npm package
+        run: |
+          npm run build
+          npm pack
+
+      - name: Build Python package
+        run: |
+          # Update version in pyproject.toml
+          VERSION="${{ needs.validate-release.outputs.version }}"
+          PYTHON_VERSION="${VERSION#v}"
+          sed -i "s/version = \".*\"/version = \"$PYTHON_VERSION\"/" pyproject.toml
+          
+          python -m build
+
+      - name: Upload build artifacts
+        uses: actions/upload-artifact@v3
+        with:
+          name: release-packages
+          path: |
+            *.tgz
+            dist/*.whl
+            dist/*.tar.gz
+
+  create-release:
+    name: Create GitHub Release
+    runs-on: ubuntu-latest
+    needs: [validate-release, build-and-test, generate-changelog, build-packages]
+    outputs:
+      release-id: ${{ steps.release.outputs.id }}
+      upload-url: ${{ steps.release.outputs.upload_url }}
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Download build artifacts
+        uses: actions/download-artifact@v3
+        with:
+          name: release-packages
+          path: ./artifacts
+
+      - name: Create GitHub Release
+        id: release
+        uses: actions/create-release@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          tag_name: ${{ needs.validate-release.outputs.version }}
+          release_name: ${{ needs.validate-release.outputs.version }}
+          body: |
+            # Causal UI Gym ${{ needs.validate-release.outputs.version }}
+            
+            ${{ needs.generate-changelog.outputs.changelog }}
+            
+            ## 🚀 Installation
+            
+            ### npm
+            ```bash
+            npm install causal-ui-gym@${{ needs.validate-release.outputs.version }}
+            ```
+            
+            ### pip
+            ```bash
+            pip install causal-ui-gym==${{ needs.validate-release.outputs.version }}
+            ```
+            
+            ## 📋 Requirements
+            
+            - Node.js >= 18
+            - Python >= 3.9
+            - JAX >= 0.4.28
+            
+            ## 🔗 Links
+            
+            - [Documentation](https://causal-ui-gym.dev/docs)
+            - [Examples](https://github.com/yourusername/causal-ui-gym/tree/main/examples)
+            - [Changelog](https://github.com/yourusername/causal-ui-gym/blob/main/CHANGELOG.md)
+            
+            ---
+            
+            **Full Changelog**: https://github.com/yourusername/causal-ui-gym/compare/...
+          draft: ${{ inputs.draft || false }}
+          prerelease: ${{ needs.validate-release.outputs.is-prerelease }}
+
+      - name: Upload npm package
+        uses: actions/upload-release-asset@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          upload_url: ${{ steps.release.outputs.upload_url }}
+          asset_path: ./artifacts/causal-ui-gym-*.tgz
+          asset_name: causal-ui-gym-${{ needs.validate-release.outputs.version }}.tgz
+          asset_content_type: application/gzip
+
+      - name: Upload Python wheel
+        uses: actions/upload-release-asset@v1
+        env:
+          GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        with:
+          upload_url: ${{ steps.release.outputs.upload_url }}
+          asset_path: ./artifacts/dist/*.whl
+          asset_name: causal_ui_gym-${{ needs.validate-release.outputs.version }}-py3-none-any.whl
+          asset_content_type: application/zip
+
+  publish-npm:
+    name: Publish to npm
+    runs-on: ubuntu-latest
+    needs: [validate-release, create-release]
+    if: ${{ !inputs.draft && needs.validate-release.outputs.is-prerelease == 'false' }}
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: ${{ env.NODE_VERSION }}
+          cache: 'npm'
+          registry-url: 'https://registry.npmjs.org'
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Build package
+        run: npm run build
+
+      - name: Update version
+        run: |
+          VERSION="${{ needs.validate-release.outputs.version }}"
+          NPM_VERSION="${VERSION#v}"
+          npm version $NPM_VERSION --no-git-tag-version
+
+      - name: Publish to npm
+        run: npm publish
+        env:
+          NODE_AUTH_TOKEN: ${{ secrets.NPM_TOKEN }}
+
+  publish-pypi:
+    name: Publish to PyPI
+    runs-on: ubuntu-latest
+    needs: [validate-release, create-release]
+    if: ${{ !inputs.draft && needs.validate-release.outputs.is-prerelease == 'false' }}
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Setup Python
+        uses: actions/setup-python@v4
+        with:
+          python-version: ${{ env.PYTHON_VERSION }}
+
+      - name: Install build dependencies
+        run: |
+          pip install --upgrade pip
+          pip install build twine
+
+      - name: Update version
+        run: |
+          VERSION="${{ needs.validate-release.outputs.version }}"
+          PYTHON_VERSION="${VERSION#v}"
+          sed -i "s/version = \".*\"/version = \"$PYTHON_VERSION\"/" pyproject.toml
+
+      - name: Build package
+        run: python -m build
+
+      - name: Publish to PyPI
+        uses: pypa/gh-action-pypi-publish@release/v1
+        with:
+          password: ${{ secrets.PYPI_API_TOKEN }}
+
+  update-documentation:
+    name: Update Documentation
+    runs-on: ubuntu-latest
+    needs: [validate-release, create-release]
+    steps:
+      - name: Checkout code
+        uses: actions/checkout@v4
+
+      - name: Update CHANGELOG.md
+        run: |
+          VERSION="${{ needs.validate-release.outputs.version }}"
+          CHANGELOG="${{ needs.generate-changelog.outputs.changelog }}"
+          
+          # Prepend to CHANGELOG.md
+          echo -e "# $VERSION ($(date -I))\n\n$CHANGELOG\n\n$(cat CHANGELOG.md)" > CHANGELOG.md
+
+      - name: Commit changelog update
+        run: |
+          git config --local user.email "action@github.com"
+          git config --local user.name "GitHub Action"
+          git add CHANGELOG.md
+          git commit -m "docs: update changelog for ${{ needs.validate-release.outputs.version }}" || exit 0
+          git push
+
+  notify-release:
+    name: Notify Release
+    runs-on: ubuntu-latest
+    needs: [validate-release, create-release, publish-npm, publish-pypi]
+    if: always()
+    steps:
+      - name: Notify Slack
+        uses: 8398a7/action-slack@v3
+        with:
+          status: ${{ job.status }}
+          channel: '#releases'
+          webhook_url: ${{ secrets.SLACK_WEBHOOK }}
+          custom_payload: |
+            {
+              "text": "🎉 New release: ${{ needs.validate-release.outputs.version }}",
+              "attachments": [{
+                "color": "good",
+                "fields": [{
+                  "title": "Version",
+                  "value": "${{ needs.validate-release.outputs.version }}",
+                  "short": true
+                }, {
+                  "title": "Pre-release",
+                  "value": "${{ needs.validate-release.outputs.is-prerelease }}",
+                  "short": true
+                }, {
+                  "title": "npm Published",
+                  "value": "${{ needs.publish-npm.result }}",
+                  "short": true
+                }, {
+                  "title": "PyPI Published",
+                  "value": "${{ needs.publish-pypi.result }}",
+                  "short": true
+                }],
+                "actions": [{
+                  "type": "button",
+                  "text": "View Release",
+                  "url": "https://github.com/${{ github.repository }}/releases/tag/${{ needs.validate-release.outputs.version }}"
+                }]
+              }]
+            }
+
+  release-summary:
+    name: Release Summary
+    runs-on: ubuntu-latest
+    needs: [validate-release, create-release, publish-npm, publish-pypi, update-documentation]
+    if: always()
+    steps:
+      - name: Generate release summary
+        run: |
+          echo "# Release Summary" > release-summary.md
+          echo "" >> release-summary.md
+          echo "## Release Information" >> release-summary.md
+          echo "- Version: ${{ needs.validate-release.outputs.version }}" >> release-summary.md
+          echo "- Pre-release: ${{ needs.validate-release.outputs.is-prerelease }}" >> release-summary.md
+          echo "- Release ID: ${{ needs.create-release.outputs.release-id }}" >> release-summary.md
+          echo "" >> release-summary.md
+          echo "## Publication Status" >> release-summary.md
+          echo "- GitHub Release: ${{ needs.create-release.result }}" >> release-summary.md
+          echo "- npm Publication: ${{ needs.publish-npm.result }}" >> release-summary.md
+          echo "- PyPI Publication: ${{ needs.publish-pypi.result }}" >> release-summary.md
+          echo "- Documentation Update: ${{ needs.update-documentation.result }}" >> release-summary.md
+          echo "" >> release-summary.md
+          echo "Generated on: $(date)" >> release-summary.md
+
+      - name: Upload release summary
+        uses: actions/upload-artifact@v3
+        with:
+          name: release-summary
+          path: release-summary.md
