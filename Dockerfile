@@ -17,7 +17,7 @@ COPY . .
 RUN npm run build
 
 # Python backend stage
-FROM python:3.11-slim AS backend-builder
+FROM python:3.13-slim AS backend-builder
 
 # Set environment variables
 ENV PYTHONDONTWRITEBYTECODE=1 \
@@ -47,7 +47,7 @@ RUN pip install --no-cache-dir -r requirements.txt
 COPY causal_ui_gym/ ./causal_ui_gym/
 
 # Production stage
-FROM python:3.11-slim AS production
+FROM python:3.13-slim AS production
 
 # Security hardening
 RUN apt-get update && apt-get install -y \
