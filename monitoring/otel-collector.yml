@@ -1,0 +1,222 @@
+# OpenTelemetry Collector configuration for Causal UI Gym
+
+receivers:
+  # OTLP receiver for traces, metrics, and logs
+  otlp:
+    protocols:
+      grpc:
+        endpoint: 0.0.0.0:4317
+      http:
+        endpoint: 0.0.0.0:4318
+        cors:
+          allowed_origins:
+            - http://localhost:5173
+            - http://localhost:3000
+          allowed_headers:
+            - "*"
+
+  # Prometheus receiver for scraping metrics
+  prometheus:
+    config:
+      scrape_configs:
+        - job_name: 'otel-collector'
+          scrape_interval: 30s
+          static_configs:
+            - targets: ['localhost:8888']
+
+  # Host metrics receiver
+  hostmetrics:
+    collection_interval: 30s
+    scrapers:
+      cpu:
+        metrics:
+          system.cpu.utilization:
+            enabled: true
+      memory:
+        metrics:
+          system.memory.utilization:
+            enabled: true
+      disk:
+        metrics:
+          system.disk.io:
+            enabled: true
+          system.disk.operations:
+            enabled: true
+      network:
+        metrics:
+          system.network.io:
+            enabled: true
+      process:
+        metrics:
+          process.cpu.utilization:
+            enabled: true
+          process.memory.utilization:
+            enabled: true
+
+  # Docker stats receiver
+  docker_stats:
+    endpoint: unix:///var/run/docker.sock
+    collection_interval: 30s
+    timeout: 20s
+    api_version: 1.41
+    metrics:
+      container.cpu.usage.total:
+        enabled: true
+      container.memory.usage.total:
+        enabled: true
+      container.network.io.usage.rx_bytes:
+        enabled: true
+      container.network.io.usage.tx_bytes:
+        enabled: true
+
+processors:
+  # Batch processor for better performance
+  batch:
+    timeout: 1s
+    send_batch_size: 1024
+    send_batch_max_size: 2048
+
+  # Memory limiter to prevent OOM
+  memory_limiter:
+    limit_mib: 256
+    spike_limit_mib: 512
+
+  # Resource processor to add metadata
+  resource:
+    attributes:
+      - key: service.instance.id
+        value: "${HOSTNAME}"
+        action: upsert
+      - key: service.version
+        value: "${SERVICE_VERSION}"
+        action: upsert
+      - key: deployment.environment
+        value: "${ENVIRONMENT}"
+        action: upsert
+
+  # Attributes processor for traces
+  attributes:
+    actions:
+      - key: http.user_agent
+        action: delete
+      - key: http.request.header.authorization
+        action: delete
+      - key: causal.experiment.id
+        action: upsert
+        from_attribute: experiment_id
+
+  # Span processor
+  span:
+    name:
+      from_attributes: ["http.method", "http.route"]
+      separator: " "
+
+  # Probabilistic sampler
+  probabilistic_sampler:
+    sampling_percentage: 10.0
+
+  # Tail sampling processor
+  tail_sampling:
+    decision_wait: 5s
+    num_traces: 50000
+    expected_new_traces_per_sec: 10
+    policies:
+      - name: errors-policy
+        type: status_code
+        status_code:
+          status_codes: [ERROR]
+      - name: slow-requests
+        type: latency
+        latency:
+          threshold_ms: 1000
+      - name: causal-computations
+        type: string_attribute
+        string_attribute:
+          key: operation.name
+          values: ["causal_computation", "llm_query"]
+      - name: sample-policy
+        type: probabilistic
+        probabilistic:
+          sampling_percentage: 5.0
+
+exporters:
+  # Prometheus exporter for metrics
+  prometheus:
+    endpoint: "0.0.0.0:8889"
+    const_labels:
+      service: causal-ui-gym
+    send_timestamps: true
+    metric_expiration: 180m
+    enable_open_metrics: true
+
+  # Jaeger exporter for traces
+  jaeger:
+    endpoint: jaeger:14250
+    tls:
+      insecure: true
+
+  # Loki exporter for logs
+  loki:
+    endpoint: http://loki:3100/loki/api/v1/push
+    tenant_id: "causal-ui-gym"
+    labels:
+      attributes:
+        service.name: "service"
+        service.instance.id: "instance"
+        log.level: "level"
+
+  # OTLP exporter (for external systems)
+  otlp:
+    endpoint: "${OTLP_ENDPOINT}"
+    headers:
+      api-key: "${OTLP_API_KEY}"
+    tls:
+      insecure: false
+
+  # Logging exporter for debugging
+  logging:
+    loglevel: info
+    sampling_initial: 5
+    sampling_thereafter: 200
+
+extensions:
+  # Health check extension
+  health_check:
+    endpoint: 0.0.0.0:13133
+
+  # Performance profiler
+  pprof:
+    endpoint: 0.0.0.0:1777
+
+  # Memory ballast
+  memory_ballast:
+    size_mib: 64
+
+service:
+  extensions: [health_check, pprof, memory_ballast]
+  
+  pipelines:
+    # Traces pipeline
+    traces:
+      receivers: [otlp]
+      processors: [memory_limiter, batch, resource, attributes, span, tail_sampling]
+      exporters: [jaeger, logging]
+
+    # Metrics pipeline
+    metrics:
+      receivers: [otlp, prometheus, hostmetrics, docker_stats]
+      processors: [memory_limiter, batch, resource]
+      exporters: [prometheus, logging]
+
+    # Logs pipeline
+    logs:
+      receivers: [otlp]
+      processors: [memory_limiter, batch, resource]
+      exporters: [loki, logging]
+
+  telemetry:
+    logs:
+      level: info
+    metrics:
+      level: detailed
+      address: 0.0.0.0:8888
