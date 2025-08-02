@@ -155,3 +155,11 @@ updates:
           - "github/codeql-action*"
           - "securecodewarrior/*"
           - "snyk/*"
+          - "aquasecurity/*"
+          - "trufflesecurity/*"
+      # Group deployment actions
+      deployment-actions:
+        patterns:
+          - "docker/*"
+          - "8398a7/action-slack*"
+          - "treosh/lighthouse-ci-action*"
