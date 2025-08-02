@@ -9,15 +9,25 @@ This document summarizes the complete implementation of GitHub Actions workflows
 Due to GitHub App permissions, the workflow files cannot be automatically pushed to the repository. **Repository maintainers must manually copy these files to complete the SDLC implementation.**
 
 ### Required Action
+The workflow files are ready and validated locally but cannot be automatically pushed due to GitHub App permission restrictions. Repository maintainers need to manually install them:
+
+**Option 1: Copy from local branch (if you have access to this branch)**
 ```bash
-# Copy the workflow files from this branch to the main branch
+git checkout terragon/implement-sdlc-checkpoints-p3k9yq
 git checkout main
-git checkout terragon/implement-sdlc-checkpoints-p3k9yq -- .github/workflows/
-git checkout terragon/implement-sdlc-checkpoints-p3k9yq -- .github/dependabot.yml
-git add .github/
-git commit -m "feat: add comprehensive GitHub Actions workflows"
-git push origin main
+mkdir -p .github/workflows
+cp .github/workflows/* /path/to/main/branch/.github/workflows/
+cp .github/dependabot.yml /path/to/main/branch/.github/dependabot.yml
 ```
+
+**Option 2: Download files from this branch**
+1. Navigate to this branch on GitHub
+2. Download the workflow files from `.github/workflows/` 
+3. Copy them to your main branch
+4. Commit and push to main
+
+**Option 3: Recreate workflows manually**
+Use the comprehensive documentation below to recreate each workflow file in `.github/workflows/`
 
 ## 📋 Implemented Workflows
 
@@ -248,15 +258,24 @@ Configure branch protection for `main` branch:
 - **Require linear history**: Enabled
 
 ### 4. Workflow File Installation
-Copy workflow files from this branch to main:
-```bash
-git checkout main
-git checkout terragon/implement-sdlc-checkpoints-p3k9yq -- .github/workflows/
-git checkout terragon/implement-sdlc-checkpoints-p3k9yq -- .github/dependabot.yml
-git add .github/
-git commit -m "feat: add comprehensive GitHub Actions workflows"
-git push origin main
-```
+
+**Available Workflow Files:**
+The following workflow files have been created and are available on this branch:
+- `.github/workflows/ci.yml` (6,145 bytes) - Continuous Integration
+- `.github/workflows/security.yml` (7,750 bytes) - Security Scanning  
+- `.github/workflows/e2e.yml` (10,297 bytes) - End-to-End Testing
+- `.github/workflows/deploy.yml` (11,040 bytes) - Deployment Automation
+- `.github/workflows/release.yml` (15,903 bytes) - Release Management
+- `.github/dependabot.yml` (enhanced) - Dependency Management
+
+**Manual Installation Required:**
+Due to GitHub App permission restrictions, these files must be manually copied to the main branch by repository maintainers with appropriate permissions.
+
+**Installation Steps:**
+1. Check out this branch locally: `git checkout terragon/implement-sdlc-checkpoints-p3k9yq`
+2. Copy workflow files to main branch
+3. Configure repository secrets as documented
+4. Test workflows with a sample PR
 
 ## 🔍 Validation Checklist
 
