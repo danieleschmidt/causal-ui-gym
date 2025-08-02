@@ -17,7 +17,13 @@
     "format": "prettier --write .",
     "format:check": "prettier --check .",
     "storybook": "storybook dev -p 6006",
-    "build-storybook": "storybook build"
+    "build-storybook": "storybook build",
+    "clean": "rm -rf dist build coverage .nyc_output",
+    "security-check": "npm audit --audit-level moderate",
+    "deps-check": "npm outdated",
+    "pre-commit": "pre-commit run --all-files",
+    "prepare": "husky install",
+    "validate": "npm run lint && npm run typecheck && npm run test && npm run security-check"
   },
   "dependencies": {
     "react": "^18.2.0",
