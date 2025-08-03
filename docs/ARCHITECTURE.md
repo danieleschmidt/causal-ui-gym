@@ -25,37 +25,72 @@ Causal UI Gym is a framework for testing LLM causal reasoning through interactiv
 ```
 src/
 ├── components/
-│   ├── CausalGraph/        # Interactive DAG visualization
-│   ├── InterventionPanel/  # UI controls for interventions
-│   ├── MetricsDashboard/   # Real-time causal metrics
-│   ├── BeliefTracker/      # LLM belief visualization
-│   └── Experiments/        # Pre-built experiment templates
+│   ├── CausalGraph/        # Interactive DAG visualization with D3.js
+│   ├── InterventionPanel/  # UI controls for causal interventions
+│   ├── MetricsDashboard/   # Real-time causal metrics visualization
+│   ├── BeliefTracker/      # LLM belief state visualization
+│   ├── ExperimentSetup/    # Experiment configuration interface
+│   └── Templates/          # Pre-built experiment templates
+├── models/
+│   ├── CausalModel.ts     # Core causal model classes
+│   ├── Experiment.ts      # Experiment configuration models
+│   └── Agent.ts           # LLM agent state models
+├── services/
+│   ├── CausalService.ts   # Frontend causal computation service
+│   ├── APIService.ts      # Backend API communication
+│   └── ExperimentService.ts # Experiment management
 ├── types/
-│   ├── causal.ts          # Causal model interfaces
-│   ├── experiment.ts      # Experiment configuration
-│   └── llm.ts             # LLM agent interfaces
+│   ├── causal.ts          # Causal model type definitions
+│   ├── experiment.ts      # Experiment configuration types
+│   ├── llm.ts             # LLM agent interface types
+│   └── metrics.ts         # Metrics and analysis types
 └── utils/
     ├── causal.ts          # Causal inference utilities
     ├── visualization.ts   # D3.js visualization helpers
-    └── metrics.ts         # Metric calculation functions
+    ├── metrics.ts         # Metric calculation functions
+    └── validation.ts      # Input validation utilities
 ```
 
-### Backend (JAX + Python)
+### Backend (JAX + FastAPI + Python)
 
 ```
 backend/
 ├── engine/
-│   ├── causal_engine.py   # Core do-calculus implementation
-│   ├── inference.py       # JAX-based inference
-│   └── dag_operations.py  # Graph manipulation
+│   ├── causal_engine.py   # Core JAX-based do-calculus implementation
+│   ├── inference.py       # Bayesian inference with JAX
+│   ├── dag_operations.py  # Graph manipulation and validation
+│   ├── interventions.py   # Intervention computation algorithms
+│   └── metrics.py         # Causal metrics (ATE, backdoor, etc.)
+├── models/
+│   ├── causal_models.py   # Pydantic models for causal structures
+│   ├── experiment_models.py # Experiment configuration models
+│   └── agent_models.py    # LLM agent interaction models
 ├── agents/
-│   ├── base_agent.py      # Abstract LLM agent
-│   ├── openai_agent.py    # OpenAI integration
-│   └── anthropic_agent.py # Anthropic integration
+│   ├── base_agent.py      # Abstract LLM agent interface
+│   ├── openai_agent.py    # OpenAI GPT integration
+│   ├── anthropic_agent.py # Anthropic Claude integration
+│   └── agent_factory.py   # Agent instantiation and management
+├── services/
+│   ├── experiment_service.py # Experiment lifecycle management
+│   ├── intervention_service.py # Intervention processing service
+│   ├── metrics_service.py # Metrics calculation service
+│   └── agent_service.py   # LLM agent orchestration
+├── repositories/
+│   ├── experiment_repo.py # Experiment data persistence
+│   ├── intervention_repo.py # Intervention history storage
+│   └── metrics_repo.py    # Metrics data storage
 └── api/
-    ├── server.py          # FastAPI server
-    ├── routes.py          # API endpoints
-    └── models.py          # Pydantic models
+    ├── server.py          # FastAPI application setup
+    ├── routes/
+    │   ├── experiments.py # Experiment management endpoints
+    │   ├── interventions.py # Intervention processing endpoints
+    │   ├── agents.py      # LLM agent interaction endpoints
+    │   └── metrics.py     # Metrics retrieval endpoints
+    ├── middleware/
+    │   ├── auth.py        # Authentication middleware
+    │   ├── cors.py        # CORS configuration
+    │   └── rate_limit.py  # Rate limiting middleware
+    └── dependencies.py    # FastAPI dependency injection
 ```
 
 ## Data Flow
