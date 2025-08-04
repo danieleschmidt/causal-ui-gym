@@ -464,9 +464,9 @@ See [CONTRIBUTING.md](CONTRIBUTING.md) for guidelines.
 ```bibtex
 @software{causal_ui_gym,
   title={Causal UI Gym: Visual Framework for Testing LLM Causal Reasoning},
-  author={Your Name},
+  author={Daniel Schmidt},
   year={2025},
-  url={https://github.com/yourusername/causal-ui-gym}
+  url={https://github.com/danieleschmidt/causal-ui-gym}
 }
 ```
 
