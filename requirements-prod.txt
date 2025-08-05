@@ -1,0 +1,141 @@
+# Production Requirements for Causal UI Gym
+# Optimized for production deployment with security and performance
+
+# Core Framework
+fastapi[all]==0.104.1
+uvicorn[standard]==0.24.0
+pydantic==2.5.0
+pydantic-settings==2.1.0
+
+# ASGI Server
+gunicorn==21.2.0
+
+# Database
+psycopg2-binary==2.9.9
+alembic==1.13.1
+sqlalchemy==2.0.23
+
+# Caching
+redis==5.0.1
+hiredis==2.2.3
+
+# Scientific Computing
+numpy==1.24.4
+jax[cpu]==0.4.20
+jaxlib==0.4.20
+
+# Machine Learning
+scikit-learn==1.3.2
+
+# HTTP Client
+httpx==0.25.2
+aiohttp==3.9.1
+
+# Security
+cryptography==41.0.8
+python-jose[cryptography]==3.3.0
+passlib[bcrypt]==1.7.4
+python-multipart==0.0.6
+
+# Monitoring & Observability
+prometheus-client==0.19.0
+opentelemetry-api==1.21.0
+opentelemetry-sdk==1.21.0
+opentelemetry-instrumentation-fastapi==0.42b0
+opentelemetry-instrumentation-sqlalchemy==0.42b0
+opentelemetry-instrumentation-redis==0.42b0
+opentelemetry-exporter-prometheus==1.12.0rc1
+
+# Logging
+structlog==23.2.0
+python-json-logger==2.0.7
+
+# Configuration
+python-dotenv==1.0.0
+pyyaml==6.0.1
+
+# Date/Time
+python-dateutil==2.8.2
+pytz==2023.3
+
+# Validation
+email-validator==2.1.0.post1
+phonenumbers==8.13.26
+
+# Async Support
+asyncio-mqtt==0.16.1
+asyncpg==0.29.0
+
+# System Monitoring
+psutil==5.9.6
+
+# Process Management
+supervisor==4.2.5
+
+# Background Tasks
+celery[redis]==5.3.4
+kombu==5.3.4
+
+# Rate Limiting
+slowapi==0.1.9
+
+# CORS
+python-cors==1.7.0
+
+# WebSocket
+websockets==12.0
+
+# File Processing
+aiofiles==23.2.1
+python-magic==0.4.27
+
+# Data Processing
+pandas==2.1.4
+pyarrow==14.0.1
+
+# Image Processing (optional)
+pillow==10.1.0
+
+# PDF Processing (optional)
+pypdf2==3.0.1
+
+# Excel Processing (optional)
+openpyxl==3.1.2
+
+# Network Security
+dnspython==2.4.2
+
+# SSL/TLS
+certifi==2023.11.17
+
+# Production WSGI/ASGI
+gevent==23.9.1
+
+# Memory Profiling
+memory-profiler==0.61.0
+
+# Performance Monitoring
+py-spy==0.3.14
+
+# Health Checks
+healthcheck==1.3.3
+
+# Backup Utilities
+boto3==1.34.0  # AWS S3 for backups
+google-cloud-storage==2.10.0  # Google Cloud Storage
+
+# Error Tracking
+sentry-sdk[fastapi]==1.38.0
+
+# Lock File Generation
+pip-tools==7.3.0
+
+# Development Tools (conditional)
+pytest==7.4.3
+pytest-asyncio==0.21.1
+pytest-cov==4.1.0
+black==23.11.0
+isort==5.12.0
+flake8==6.1.0
+mypy==1.7.1
+pre-commit==3.6.0

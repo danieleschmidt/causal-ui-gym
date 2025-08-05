@@ -1,0 +1,279 @@
+# Production Docker Compose for Causal UI Gym
+# Includes all necessary services for production deployment
+
+version: '3.8'
+
+services:
+  # Main Application
+  causal-ui-gym:
+    build:
+      context: ..
+      dockerfile: Dockerfile
+      target: production
+    container_name: causal-ui-gym-app
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "8000:8000"
+    environment:
+      - ENVIRONMENT=production
+      - REDIS_ENABLED=true
+      - REDIS_URL=redis://redis:6379/0
+      - DATABASE_URL=postgresql://causal_user:${DB_PASSWORD}@postgres:5432/causal_ui_gym
+      - PROMETHEUS_MULTIPROC_DIR=/tmp/prometheus
+    env_file:
+      - .env.production
+    volumes:
+      - app_logs:/app/logs
+      - app_data:/app/data
+      - prometheus_data:/tmp/prometheus
+    depends_on:
+      - postgres
+      - redis
+    networks:
+      - causal_network
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost/health"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+    deploy:
+      resources:
+        limits:
+          cpus: '2.0'
+          memory: 2G
+        reservations:
+          cpus: '1.0'
+          memory: 1G
+
+  # PostgreSQL Database
+  postgres:
+    image: postgres:15-alpine
+    container_name: causal-ui-gym-db
+    restart: unless-stopped
+    environment:
+      - POSTGRES_DB=causal_ui_gym
+      - POSTGRES_USER=causal_user
+      - POSTGRES_PASSWORD=${DB_PASSWORD}
+      - POSTGRES_INITDB_ARGS=--encoding=UTF-8 --locale=C
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./init-db.sql:/docker-entrypoint-initdb.d/init-db.sql:ro
+    networks:
+      - causal_network
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U causal_user -d causal_ui_gym"]
+      interval: 30s
+      timeout: 10s
+      retries: 5
+    deploy:
+      resources:
+        limits:
+          cpus: '1.0'
+          memory: 1G
+        reservations:
+          cpus: '0.5'
+          memory: 512M
+
+  # Redis Cache
+  redis:
+    image: redis:7-alpine
+    container_name: causal-ui-gym-cache
+    restart: unless-stopped
+    command: redis-server --appendonly yes --maxmemory 256mb --maxmemory-policy allkeys-lru
+    volumes:
+      - redis_data:/data
+    networks:
+      - causal_network
+    healthcheck:
+      test: ["CMD", "redis-cli", "ping"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    deploy:
+      resources:
+        limits:
+          cpus: '0.5'
+          memory: 512M
+        reservations:
+          cpus: '0.2'
+          memory: 256M
+
+  # Prometheus Monitoring
+  prometheus:
+    image: prom/prometheus:latest
+    container_name: causal-ui-gym-prometheus
+    restart: unless-stopped
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
+      - '--web.console.libraries=/etc/prometheus/console_libraries'
+      - '--web.console.templates=/etc/prometheus/consoles'
+      - '--storage.tsdb.retention.time=30d'
+      - '--web.enable-lifecycle'
+    ports:
+      - "9090:9090"
+    volumes:
+      - ../monitoring/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - prometheus_storage:/prometheus
+    networks:
+      - causal_network
+    depends_on:
+      - causal-ui-gym
+    deploy:
+      resources:
+        limits:
+          cpus: '0.5'
+          memory: 512M
+
+  # Grafana Dashboard
+  grafana:
+    image: grafana/grafana:latest
+    container_name: causal-ui-gym-grafana
+    restart: unless-stopped
+    ports:
+      - "3000:3000"
+    environment:
+      - GF_SECURITY_ADMIN_PASSWORD=${GRAFANA_PASSWORD:-admin}
+      - GF_USERS_ALLOW_SIGN_UP=false
+    volumes:
+      - grafana_data:/var/lib/grafana
+      - ./grafana-datasources.yml:/etc/grafana/provisioning/datasources/datasources.yml:ro
+      - ./grafana-dashboards.yml:/etc/grafana/provisioning/dashboards/dashboards.yml:ro
+    networks:
+      - causal_network
+    depends_on:
+      - prometheus
+    deploy:
+      resources:
+        limits:
+          cpus: '0.5'
+          memory: 512M
+
+  # Nginx Load Balancer (for multiple app instances)
+  nginx-lb:
+    image: nginx:alpine
+    container_name: causal-ui-gym-lb
+    restart: unless-stopped
+    ports:
+      - "443:443"
+    volumes:
+      - ./nginx-lb.conf:/etc/nginx/nginx.conf:ro
+      - ./ssl-certs:/etc/nginx/ssl:ro
+    networks:
+      - causal_network
+    depends_on:
+      - causal-ui-gym
+    deploy:
+      resources:
+        limits:
+          cpus: '0.3'
+          memory: 256M
+
+  # Log Aggregation (ELK Stack - Elasticsearch)
+  elasticsearch:
+    image: docker.elastic.co/elasticsearch/elasticsearch:8.11.0
+    container_name: causal-ui-gym-elasticsearch
+    restart: unless-stopped
+    environment:
+      - discovery.type=single-node
+      - ES_JAVA_OPTS=-Xms1g -Xmx1g
+      - xpack.security.enabled=false
+    volumes:
+      - elasticsearch_data:/usr/share/elasticsearch/data
+    networks:
+      - causal_network
+    deploy:
+      resources:
+        limits:
+          cpus: '1.0'
+          memory: 2G
+
+  # Kibana Dashboard
+  kibana:
+    image: docker.elastic.co/kibana/kibana:8.11.0
+    container_name: causal-ui-gym-kibana
+    restart: unless-stopped
+    ports:
+      - "5601:5601"
+    environment:
+      - ELASTICSEARCH_HOSTS=http://elasticsearch:9200
+    networks:
+      - causal_network
+    depends_on:
+      - elasticsearch
+    deploy:
+      resources:
+        limits:
+          cpus: '0.5'
+          memory: 1G
+
+  # Logstash for Log Processing
+  logstash:
+    image: docker.elastic.co/logstash/logstash:8.11.0
+    container_name: causal-ui-gym-logstash
+    restart: unless-stopped
+    volumes:
+      - ./logstash.conf:/usr/share/logstash/pipeline/logstash.conf:ro
+      - app_logs:/app/logs:ro
+    networks:
+      - causal_network
+    depends_on:
+      - elasticsearch
+    deploy:
+      resources:
+        limits:
+          cpus: '0.5'
+          memory: 1G
+
+  # Backup Service
+  backup:
+    image: postgres:15-alpine
+    container_name: causal-ui-gym-backup
+    restart: "no"
+    command: |
+      sh -c '
+        while true; do
+          echo "Starting backup at $$(date)"
+          pg_dump -h postgres -U causal_user -d causal_ui_gym > /backup/backup_$$(date +%Y%m%d_%H%M%S).sql
+          find /backup -name "backup_*.sql" -mtime +30 -delete
+          echo "Backup completed, sleeping for 24 hours"
+          sleep 86400
+        done
+      '
+    environment:
+      - PGPASSWORD=${DB_PASSWORD}
+    volumes:
+      - backup_data:/backup
+    networks:
+      - causal_network
+    depends_on:
+      - postgres
+
+volumes:
+  postgres_data:
+    driver: local
+  redis_data:
+    driver: local
+  app_logs:
+    driver: local
+  app_data:
+    driver: local
+  prometheus_data:
+    driver: local
+  prometheus_storage:
+    driver: local
+  grafana_data:
+    driver: local
+  elasticsearch_data:
+    driver: local
+  backup_data:
+    driver: local
+
+networks:
+  causal_network:
+    driver: bridge
+    ipam:
+      config:
+        - subnet: 172.20.0.0/16

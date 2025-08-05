@@ -428,3 +428,127 @@ export function measurePerformance<T>(
     throw error;
   }
 }
+
+// Causal-specific metrics and utilities
+import { CausalDAG, CausalMetric, Intervention } from '../types'
+
+export const calculateBasicStats = (data: number[]) => {
+  if (data.length === 0) return { mean: 0, variance: 0, stdDev: 0 }
+  
+  const sum = data.reduce((acc, val) => acc + val, 0)
+  const mean = sum / data.length
+  const variance = data.reduce((acc, val) => acc + Math.pow(val - mean, 2), 0) / data.length
+  const stdDev = Math.sqrt(variance)
+  
+  return { mean, variance, stdDev }
+}
+
+export const calculateATE = (
+  treatmentOutcomes: number[],
+  controlOutcomes: number[]
+): CausalMetric => {
+  const treatmentStats = calculateBasicStats(treatmentOutcomes)
+  const controlStats = calculateBasicStats(controlOutcomes)
+  
+  const ate = treatmentStats.mean - controlStats.mean
+  const pooledVariance = (treatmentStats.variance + controlStats.variance) / 2
+  const standardError = Math.sqrt(pooledVariance * (1/treatmentOutcomes.length + 1/controlOutcomes.length))
+  
+  const tStatistic = ate / standardError
+  const degreesOfFreedom = treatmentOutcomes.length + controlOutcomes.length - 2
+  const pValue = 2 * (1 - studentTCDF(Math.abs(tStatistic), degreesOfFreedom))
+  
+  const confidenceLevel = 0.95
+  const tCritical = studentTInverse((1 - confidenceLevel) / 2, degreesOfFreedom)
+  const marginOfError = tCritical * standardError
+  
+  return {
+    metric_type: 'ate',
+    value: ate,
+    confidence_interval: [ate - marginOfError, ate + marginOfError],
+    standard_error: standardError,
+    p_value: pValue,
+    sample_size: treatmentOutcomes.length + controlOutcomes.length,
+    computation_time: 0,
+    metadata: {
+      treatment_mean: treatmentStats.mean,
+      control_mean: controlStats.mean,
+      t_statistic: tStatistic,
+      degrees_of_freedom: degreesOfFreedom
+    }
+  }
+}
+
+export const calculateCausalAccuracy = (
+  predictedEffects: number[],
+  trueEffects: number[]
+): number => {
+  if (predictedEffects.length !== trueEffects.length) {
+    throw new Error('Predicted and true effects arrays must have the same length')
+  }
+  
+  const squaredErrors = predictedEffects.map((pred, i) => 
+    Math.pow(pred - trueEffects[i], 2)
+  )
+  
+  const mse = squaredErrors.reduce((sum, error) => sum + error, 0) / squaredErrors.length
+  const trueMean = trueEffects.reduce((sum, val) => sum + val, 0) / trueEffects.length
+  const totalVariance = trueEffects.reduce((sum, val) => sum + Math.pow(val - trueMean, 2), 0)
+  
+  const r2 = 1 - (squaredErrors.reduce((sum, error) => sum + error, 0) / totalVariance)
+  
+  return Math.max(0, r2)
+}
+
+function studentTCDF(t: number, df: number): number {
+  if (df <= 0) return 0.5
+  if (t === 0) return 0.5
+  
+  const x = df / (t * t + df)
+  return 0.5 + 0.5 * Math.sign(t) * (1 - incompleteBeta(0.5, df / 2, x))
+}
+
+function studentTInverse(p: number, df: number): number {
+  if (p <= 0 || p >= 1) throw new Error('p must be between 0 and 1')
+  
+  const t_table: { [key: number]: number[] } = {
+    1: [0, 1.000, 3.078, 6.314, 12.71, 31.82],
+    2: [0, 0.816, 1.886, 2.920, 4.303, 6.965],
+    5: [0, 0.727, 1.476, 2.015, 2.571, 3.365],
+    10: [0, 0.700, 1.372, 1.812, 2.228, 2.764],
+    20: [0, 0.687, 1.325, 1.725, 2.086, 2.528],
+    30: [0, 0.683, 1.310, 1.697, 2.042, 2.457]
+  }
+  
+  const alpha = 1 - p
+  const closestDf = Object.keys(t_table).map(Number).reduce((prev, curr) =>
+    Math.abs(curr - df) < Math.abs(prev - df) ? curr : prev
+  )
+  
+  if (alpha <= 0.025) return t_table[closestDf][3]
+  if (alpha <= 0.05) return t_table[closestDf][2]
+  if (alpha <= 0.1) return t_table[closestDf][1]
+  
+  return t_table[closestDf][4]
+}
+
+function incompleteBeta(a: number, b: number, x: number): number {
+  if (x <= 0) return 0
+  if (x >= 1) return 1
+  
+  let result = 0
+  let term = 1
+  
+  for (let n = 0; n < 100; n++) {
+    if (n > 0) {
+      term *= (a + n - 1) * x / n
+    }
+    
+    const factor = Math.pow(1 - x, b) / (b + n)
+    result += term * factor
+    
+    if (Math.abs(term * factor) < 1e-10) break
+  }
+  
+  return Math.pow(x, a) * result
+}

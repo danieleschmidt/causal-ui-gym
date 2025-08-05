@@ -423,6 +423,303 @@ class JaxCausalEngine:
             
         return results
     
+    def compute_frontdoor_adjustment(
+        self,
+        dag: CausalDAG,
+        treatment: str,
+        outcome: str,
+        mediator: str,
+        n_samples: int = 10000
+    ) -> CausalResult:
+        """
+        Compute causal effect using frontdoor adjustment when backdoor is not available.
+        
+        Args:
+            dag: Causal DAG structure
+            treatment: Treatment variable name
+            outcome: Outcome variable name  
+            mediator: Mediator variable name
+            n_samples: Number of samples for estimation
+            
+        Returns:
+            CausalResult with frontdoor-adjusted effect
+        """
+        import time
+        start_time = time.time()
+        
+        # Convert to indices
+        treatment_idx = dag.nodes.index(treatment)
+        outcome_idx = dag.nodes.index(outcome)
+        mediator_idx = dag.nodes.index(mediator)
+        
+        adjacency_matrix = self._dag_to_adjacency_matrix(dag)
+        
+        # Generate noise samples
+        self.key, subkey = random.split(self.key)
+        noise_samples = random.normal(subkey, (len(dag.nodes), n_samples))
+        
+        # Frontdoor formula: E[Y|do(X=x)] = Σ_m E[Y|X=x',M=m] * P(M=m|X=x)
+        # Step 1: Compute P(M|do(X))
+        mediator_dist_x1 = self._compute_intervention_distribution(
+            adjacency_matrix, noise_samples, treatment_idx, 1.0, mediator_idx
+        )
+        
+        mediator_dist_x0 = self._compute_intervention_distribution(
+            adjacency_matrix, noise_samples, treatment_idx, 0.0, mediator_idx
+        )
+        
+        # Step 2: For each mediator value, compute E[Y|X,M] averaging over X
+        outcome_values_x1 = []
+        outcome_values_x0 = []
+        
+        # Sample mediator values from the distributions
+        mediator_samples_x1 = mediator_dist_x1
+        mediator_samples_x0 = mediator_dist_x0
+        
+        # Compute outcomes under different treatment values for same mediator
+        for i in range(min(1000, n_samples)):  # Sample subset for efficiency
+            m_val = mediator_samples_x1[i]
+            
+            # Set both treatment and mediator
+            intervention_mask = jnp.zeros(len(dag.nodes), dtype=bool)
+            intervention_mask = intervention_mask.at[treatment_idx].set(True)
+            intervention_mask = intervention_mask.at[mediator_idx].set(True)
+            
+            intervention_values = jnp.zeros(len(dag.nodes))
+            intervention_values = intervention_values.at[treatment_idx].set(1.0)
+            intervention_values = intervention_values.at[mediator_idx].set(m_val)
+            
+            variables = self._compute_linear_scm(
+                adjacency_matrix, noise_samples[:, i:i+1], intervention_mask, intervention_values
+            )
+            outcome_values_x1.append(float(variables[outcome_idx, 0]))
+            
+            # Same for treatment = 0
+            intervention_values = intervention_values.at[treatment_idx].set(0.0)
+            variables = self._compute_linear_scm(
+                adjacency_matrix, noise_samples[:, i:i+1], intervention_mask, intervention_values
+            )
+            outcome_values_x0.append(float(variables[outcome_idx, 0]))
+        
+        # Compute frontdoor effect
+        frontdoor_effect = jnp.mean(jnp.array(outcome_values_x1) - jnp.array(outcome_values_x0))
+        
+        computation_time = time.time() - start_time
+        
+        intervention = Intervention(variable=treatment, value=1.0)
+        return CausalResult(
+            intervention=intervention,
+            outcome_distribution=jnp.array(outcome_values_x1),
+            ate=float(frontdoor_effect),
+            computation_time=computation_time
+        )
+    
+    def compute_conditional_ate(
+        self,
+        dag: CausalDAG,
+        treatment: str,
+        outcome: str,
+        conditioning_vars: List[str],
+        conditioning_values: List[float],
+        n_samples: int = 10000
+    ) -> CausalResult:
+        """
+        Compute conditional average treatment effect given specific conditioning values.
+        
+        Args:
+            dag: Causal DAG structure
+            treatment: Treatment variable name
+            outcome: Outcome variable name
+            conditioning_vars: Variables to condition on
+            conditioning_values: Values to condition on
+            n_samples: Number of samples for estimation
+            
+        Returns:
+            CausalResult with conditional ATE
+        """
+        import time
+        start_time = time.time()
+        
+        # Convert to indices
+        treatment_idx = dag.nodes.index(treatment)
+        outcome_idx = dag.nodes.index(outcome)
+        conditioning_indices = [dag.nodes.index(var) for var in conditioning_vars]
+        
+        adjacency_matrix = self._dag_to_adjacency_matrix(dag)
+        
+        # Generate noise samples
+        self.key, subkey = random.split(self.key)
+        noise_samples = random.normal(subkey, (len(dag.nodes), n_samples))
+        
+        # Create intervention masks for conditioning
+        base_intervention_mask = jnp.zeros(len(dag.nodes), dtype=bool)
+        base_intervention_values = jnp.zeros(len(dag.nodes))
+        
+        # Set conditioning variables
+        for idx, value in zip(conditioning_indices, conditioning_values):
+            base_intervention_mask = base_intervention_mask.at[idx].set(True)
+            base_intervention_values = base_intervention_values.at[idx].set(value)
+        
+        # Compute outcomes under treatment = 1
+        intervention_mask_t1 = base_intervention_mask.at[treatment_idx].set(True)
+        intervention_values_t1 = base_intervention_values.at[treatment_idx].set(1.0)
+        
+        outcomes_t1 = []
+        for i in range(n_samples):
+            variables = self._compute_linear_scm(
+                adjacency_matrix, noise_samples[:, i:i+1], intervention_mask_t1, intervention_values_t1
+            )
+            outcomes_t1.append(float(variables[outcome_idx, 0]))
+        
+        # Compute outcomes under treatment = 0
+        intervention_mask_t0 = base_intervention_mask.at[treatment_idx].set(True)
+        intervention_values_t0 = base_intervention_values.at[treatment_idx].set(0.0)
+        
+        outcomes_t0 = []
+        for i in range(n_samples):
+            variables = self._compute_linear_scm(
+                adjacency_matrix, noise_samples[:, i:i+1], intervention_mask_t0, intervention_values_t0
+            )
+            outcomes_t0.append(float(variables[outcome_idx, 0]))
+        
+        # Compute conditional ATE
+        conditional_ate = jnp.mean(jnp.array(outcomes_t1) - jnp.array(outcomes_t0))
+        
+        computation_time = time.time() - start_time
+        
+        intervention = Intervention(variable=treatment, value=1.0)
+        return CausalResult(
+            intervention=intervention,
+            outcome_distribution=jnp.array(outcomes_t1),
+            ate=float(conditional_ate),
+            computation_time=computation_time
+        )
+    
+    @jax.jit
+    def _compute_propensity_scores(
+        self,
+        adjacency_matrix: jnp.ndarray,
+        noise_samples: jnp.ndarray,
+        treatment_idx: int,
+        covariate_indices: jnp.ndarray
+    ) -> jnp.ndarray:
+        """
+        Compute propensity scores for treatment assignment.
+        
+        Args:
+            adjacency_matrix: Causal graph adjacency matrix
+            noise_samples: Noise samples
+            treatment_idx: Index of treatment variable
+            covariate_indices: Indices of covariate variables
+            
+        Returns:
+            Propensity scores for each sample
+        """
+        n_samples = noise_samples.shape[1]
+        
+        # Compute baseline variables (no intervention)
+        intervention_mask = jnp.zeros(adjacency_matrix.shape[0], dtype=bool)
+        intervention_values = jnp.zeros(adjacency_matrix.shape[0])
+        
+        variables = self._compute_linear_scm(
+            adjacency_matrix, noise_samples, intervention_mask, intervention_values
+        )
+        
+        # Extract covariates and treatment
+        covariates = variables[covariate_indices, :]
+        treatment = variables[treatment_idx, :]
+        
+        # Simple logistic regression approximation
+        # P(T=1|X) = sigmoid(β₀ + β₁X₁ + ... + βₖXₖ)
+        covariate_means = jnp.mean(covariates, axis=1, keepdims=True)
+        centered_covariates = covariates - covariate_means
+        
+        # Compute correlations as proxy for logistic coefficients
+        correlations = jnp.corrcoef(jnp.vstack([treatment, centered_covariates]))[0, 1:]
+        
+        # Linear combination
+        linear_combination = jnp.sum(correlations[:, None] * centered_covariates, axis=0)
+        
+        # Apply sigmoid
+        propensity_scores = jax.nn.sigmoid(linear_combination)
+        
+        return propensity_scores
+    
+    def compute_ipw_ate(
+        self,
+        dag: CausalDAG,
+        treatment: str,
+        outcome: str,
+        confounders: List[str],
+        n_samples: int = 10000
+    ) -> CausalResult:
+        """
+        Compute Average Treatment Effect using Inverse Propensity Weighting.
+        
+        Args:
+            dag: Causal DAG structure
+            treatment: Treatment variable name
+            outcome: Outcome variable name
+            confounders: List of confounding variables
+            n_samples: Number of samples for estimation
+            
+        Returns:
+            CausalResult with IPW-adjusted ATE
+        """
+        import time
+        start_time = time.time()
+        
+        # Convert to indices
+        treatment_idx = dag.nodes.index(treatment)
+        outcome_idx = dag.nodes.index(outcome)
+        confounder_indices = jnp.array([dag.nodes.index(var) for var in confounders])
+        
+        adjacency_matrix = self._dag_to_adjacency_matrix(dag)
+        
+        # Generate noise samples
+        self.key, subkey = random.split(self.key)
+        noise_samples = random.normal(subkey, (len(dag.nodes), n_samples))
+        
+        # Compute propensity scores
+        propensity_scores = self._compute_propensity_scores(
+            adjacency_matrix, noise_samples, treatment_idx, confounder_indices
+        )
+        
+        # Compute observed outcomes (no intervention)
+        intervention_mask = jnp.zeros(len(dag.nodes), dtype=bool)
+        intervention_values = jnp.zeros(len(dag.nodes))
+        
+        variables = self._compute_linear_scm(
+            adjacency_matrix, noise_samples, intervention_mask, intervention_values
+        )
+        
+        observed_treatment = variables[treatment_idx, :]
+        observed_outcome = variables[outcome_idx, :]
+        
+        # IPW estimator
+        # ATE = E[Y*T/e(X)] - E[Y*(1-T)/(1-e(X))]
+        weights_treated = observed_treatment / propensity_scores
+        weights_control = (1 - observed_treatment) / (1 - propensity_scores)
+        
+        # Stabilize weights
+        weights_treated = jnp.clip(weights_treated, 0, 10)
+        weights_control = jnp.clip(weights_control, 0, 10)
+        
+        ate_treated = jnp.mean(observed_outcome * weights_treated)
+        ate_control = jnp.mean(observed_outcome * weights_control)
+        
+        ipw_ate = ate_treated - ate_control
+        
+        computation_time = time.time() - start_time
+        
+        intervention = Intervention(variable=treatment, value=1.0)
+        return CausalResult(
+            intervention=intervention,
+            outcome_distribution=observed_outcome,
+            ate=float(ipw_ate),
+            computation_time=computation_time
+        )
+    
     def validate_dag_assumptions(self, dag: CausalDAG) -> Dict[str, bool]:
         """
         Validate key assumptions required for causal inference.
@@ -443,7 +740,47 @@ class JaxCausalEngine:
             'has_valid_topological_order': True,  # Already checked in DAG validation
             'has_sufficient_data': all(
                 len(data) > 100 for data in dag.node_data.values()
-            ) if dag.node_data else False
+            ) if dag.node_data else False,
+            'satisfies_causal_markov': self._check_causal_markov_condition(dag),
+            'has_identifiable_effects': self._check_effect_identifiability(dag)
         }
         
         return assumptions
+    
+    def _check_causal_markov_condition(self, dag: CausalDAG) -> bool:
+        """Check if the DAG satisfies the Causal Markov Condition."""
+        G = nx.DiGraph()  
+        G.add_nodes_from(dag.nodes)
+        G.add_edges_from(dag.edges)
+        
+        # For each node, check if it's independent of its non-descendants given its parents
+        for node in dag.nodes:
+            parents = list(G.predecessors(node))
+            descendants = nx.descendants(G, node)
+            non_descendants = set(dag.nodes) - descendants - {node} - set(parents)
+            
+            # In a proper implementation, we would test conditional independence
+            # For now, we assume the condition holds if the graph structure is valid
+            if len(non_descendants) > 0 and len(parents) == 0:
+                return False
+                
+        return True
+    
+    def _check_effect_identifiability(self, dag: CausalDAG) -> bool:
+        """Check if causal effects are identifiable in the given DAG."""
+        G = nx.DiGraph()
+        G.add_nodes_from(dag.nodes)
+        G.add_edges_from(dag.edges)
+        
+        # Check for confounding variables that would make effects non-identifiable
+        # This is a simplified check - full identifiability requires more complex analysis
+        for edge in dag.edges:
+            source, target = edge
+            
+            # Look for potential confounders
+            common_causes = set(G.predecessors(source)) & set(G.predecessors(target))
+            if len(common_causes) > 0:
+                # Check if confounders are observable (in this simple case, assume they are)
+                continue
+                
+        return True

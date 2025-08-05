@@ -1,0 +1,508 @@
+# Kubernetes Deployment Configuration for Causal UI Gym
+# Production-ready deployment with auto-scaling, health checks, and monitoring
+
+apiVersion: v1
+kind: Namespace
+metadata:
+  name: causal-ui-gym
+  labels:
+    name: causal-ui-gym
+    environment: production
+
+---
+# ConfigMap for application configuration
+apiVersion: v1
+kind: ConfigMap
+metadata:
+  name: causal-ui-gym-config
+  namespace: causal-ui-gym
+data:
+  ENVIRONMENT: "production"
+  NODE_ENV: "production"
+  LOG_LEVEL: "info"
+  REDIS_ENABLED: "true"
+  METRICS_ENABLED: "true"
+  PROMETHEUS_ENABLED: "true"
+
+---
+# Secret for sensitive data
+apiVersion: v1
+kind: Secret
+metadata:
+  name: causal-ui-gym-secrets
+  namespace: causal-ui-gym
+type: Opaque
+stringData:
+  SECRET_KEY: "your-secret-key-here"
+  JWT_SECRET: "your-jwt-secret-here"
+  OPENAI_API_KEY: "your-openai-api-key"
+  ANTHROPIC_API_KEY: "your-anthropic-api-key"
+  DB_PASSWORD: "your-db-password"
+  REDIS_PASSWORD: "your-redis-password"
+
+---
+# PostgreSQL Deployment
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: postgres
+  namespace: causal-ui-gym
+  labels:
+    app: postgres
+    component: database
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: postgres
+  template:
+    metadata:
+      labels:
+        app: postgres
+        component: database
+    spec:
+      containers:
+      - name: postgres
+        image: postgres:15-alpine
+        ports:
+        - containerPort: 5432
+        env:
+        - name: POSTGRES_DB
+          value: "causal_ui_gym"
+        - name: POSTGRES_USER
+          value: "causal_user"
+        - name: POSTGRES_PASSWORD
+          valueFrom:
+            secretKeyRef:
+              name: causal-ui-gym-secrets
+              key: DB_PASSWORD
+        volumeMounts:
+        - name: postgres-storage
+          mountPath: /var/lib/postgresql/data
+        resources:
+          requests:
+            cpu: 200m
+            memory: 256Mi
+          limits:
+            cpu: 500m
+            memory: 512Mi
+        livenessProbe:
+          exec:
+            command:
+            - pg_isready
+            - -U
+            - causal_user
+            - -d
+            - causal_ui_gym
+          initialDelaySeconds: 30
+          periodSeconds: 10
+        readinessProbe:
+          exec:
+            command:
+            - pg_isready
+            - -U
+            - causal_user
+            - -d
+            - causal_ui_gym
+          initialDelaySeconds: 5
+          periodSeconds: 5
+      volumes:
+      - name: postgres-storage
+        persistentVolumeClaim:
+          claimName: postgres-pvc
+
+---
+# PostgreSQL Service
+apiVersion: v1
+kind: Service
+metadata:
+  name: postgres
+  namespace: causal-ui-gym
+  labels:
+    app: postgres
+spec:
+  ports:
+  - port: 5432
+    targetPort: 5432
+  selector:
+    app: postgres
+
+---
+# Redis Deployment
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: redis
+  namespace: causal-ui-gym
+  labels:
+    app: redis
+    component: cache
+spec:
+  replicas: 1
+  selector:
+    matchLabels:
+      app: redis
+  template:
+    metadata:
+      labels:
+        app: redis
+        component: cache
+    spec:
+      containers:
+      - name: redis
+        image: redis:7-alpine
+        ports:
+        - containerPort: 6379
+        command: ["redis-server"]
+        args: ["--appendonly", "yes", "--maxmemory", "256mb", "--maxmemory-policy", "allkeys-lru"]
+        volumeMounts:
+        - name: redis-storage
+          mountPath: /data
+        resources:
+          requests:
+            cpu: 100m
+            memory: 128Mi
+          limits:
+            cpu: 200m
+            memory: 256Mi
+        livenessProbe:
+          exec:
+            command:
+            - redis-cli
+            - ping
+          initialDelaySeconds: 30
+          periodSeconds: 10
+        readinessProbe:
+          exec:
+            command:
+            - redis-cli
+            - ping
+          initialDelaySeconds: 5
+          periodSeconds: 5
+      volumes:
+      - name: redis-storage
+        persistentVolumeClaim:
+          claimName: redis-pvc
+
+---
+# Redis Service
+apiVersion: v1
+kind: Service
+metadata:
+  name: redis
+  namespace: causal-ui-gym
+  labels:
+    app: redis
+spec:
+  ports:
+  - port: 6379
+    targetPort: 6379
+  selector:
+    app: redis
+
+---
+# Main Application Deployment
+apiVersion: apps/v1
+kind: Deployment
+metadata:
+  name: causal-ui-gym
+  namespace: causal-ui-gym
+  labels:
+    app: causal-ui-gym
+    component: application
+spec:
+  replicas: 3
+  selector:
+    matchLabels:
+      app: causal-ui-gym
+  template:
+    metadata:
+      labels:
+        app: causal-ui-gym
+        component: application
+      annotations:
+        prometheus.io/scrape: "true"
+        prometheus.io/port: "8000"
+        prometheus.io/path: "/metrics"
+    spec:
+      securityContext:
+        runAsNonRoot: true
+        runAsUser: 10001
+        runAsGroup: 10001
+        fsGroup: 10001
+      containers:
+      - name: causal-ui-gym
+        image: causal-ui-gym:latest
+        ports:
+        - containerPort: 80
+          name: http
+        - containerPort: 8000
+          name: api
+        env:
+        - name: DATABASE_URL
+          value: "postgresql://causal_user:$(DB_PASSWORD)@postgres:5432/causal_ui_gym"
+        - name: REDIS_URL
+          value: "redis://redis:6379/0"
+        envFrom:
+        - configMapRef:
+            name: causal-ui-gym-config
+        - secretRef:
+            name: causal-ui-gym-secrets
+        volumeMounts:
+        - name: app-storage
+          mountPath: /app/data
+        - name: logs-storage
+          mountPath: /app/logs
+        resources:
+          requests:
+            cpu: 500m
+            memory: 1Gi
+          limits:
+            cpu: 2000m
+            memory: 2Gi
+        livenessProbe:
+          httpGet:
+            path: /health
+            port: 80
+          initialDelaySeconds: 60
+          periodSeconds: 30
+          timeoutSeconds: 10
+          failureThreshold: 3
+        readinessProbe:
+          httpGet:
+            path: /ready
+            port: 80
+          initialDelaySeconds: 30
+          periodSeconds: 10
+          timeoutSeconds: 5
+          failureThreshold: 3
+        startupProbe:
+          httpGet:
+            path: /health
+            port: 80
+          initialDelaySeconds: 10
+          periodSeconds: 10
+          timeoutSeconds: 5
+          failureThreshold: 30
+      volumes:
+      - name: app-storage
+        persistentVolumeClaim:
+          claimName: app-pvc
+      - name: logs-storage
+        emptyDir: {}
+
+---
+# Application Service
+apiVersion: v1
+kind: Service
+metadata:
+  name: causal-ui-gym
+  namespace: causal-ui-gym
+  labels:
+    app: causal-ui-gym
+  annotations:
+    prometheus.io/scrape: "true"
+    prometheus.io/port: "8000"
+spec:
+  type: ClusterIP
+  ports:
+  - port: 80
+    targetPort: 80
+    name: http
+  - port: 8000
+    targetPort: 8000
+    name: api
+  selector:
+    app: causal-ui-gym
+
+---
+# Ingress for external access
+apiVersion: networking.k8s.io/v1
+kind: Ingress
+metadata:
+  name: causal-ui-gym-ingress
+  namespace: causal-ui-gym
+  annotations:
+    kubernetes.io/ingress.class: "nginx"
+    nginx.ingress.kubernetes.io/rewrite-target: /
+    nginx.ingress.kubernetes.io/ssl-redirect: "true"
+    nginx.ingress.kubernetes.io/force-ssl-redirect: "true"
+    nginx.ingress.kubernetes.io/rate-limit: "100"
+    nginx.ingress.kubernetes.io/rate-limit-window: "1m"
+    cert-manager.io/cluster-issuer: "letsencrypt-prod"
+spec:
+  tls:
+  - hosts:
+    - causal-ui-gym.yourdomain.com
+    secretName: causal-ui-gym-tls
+  rules:
+  - host: causal-ui-gym.yourdomain.com
+    http:
+      paths:
+      - path: /
+        pathType: Prefix
+        backend:
+          service:
+            name: causal-ui-gym
+            port:
+              number: 80
+
+---
+# Horizontal Pod Autoscaler
+apiVersion: autoscaling/v2
+kind: HorizontalPodAutoscaler
+metadata:
+  name: causal-ui-gym-hpa
+  namespace: causal-ui-gym
+spec:
+  scaleTargetRef:
+    apiVersion: apps/v1
+    kind: Deployment
+    name: causal-ui-gym
+  minReplicas: 3
+  maxReplicas: 10
+  metrics:
+  - type: Resource
+    resource:
+      name: cpu
+      target:
+        type: Utilization
+        averageUtilization: 70
+  - type: Resource
+    resource:
+      name: memory
+      target:
+        type: Utilization
+        averageUtilization: 80
+  behavior:
+    scaleDown:
+      stabilizationWindowSeconds: 300
+      policies:
+      - type: Percent
+        value: 10
+        periodSeconds: 60
+    scaleUp:
+      stabilizationWindowSeconds: 60
+      policies:
+      - type: Percent
+        value: 100
+        periodSeconds: 15
+
+---
+# Persistent Volume Claims
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: postgres-pvc
+  namespace: causal-ui-gym
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 10Gi
+  storageClassName: fast-ssd
+
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: redis-pvc
+  namespace: causal-ui-gym
+spec:
+  accessModes:
+    - ReadWriteOnce
+  resources:
+    requests:
+      storage: 2Gi
+  storageClassName: fast-ssd
+
+---
+apiVersion: v1
+kind: PersistentVolumeClaim
+metadata:
+  name: app-pvc
+  namespace: causal-ui-gym
+spec:
+  accessModes:
+    - ReadWriteMany
+  resources:
+    requests:
+      storage: 5Gi
+  storageClassName: fast-ssd
+
+---
+# Network Policy for security
+apiVersion: networking.k8s.io/v1
+kind: NetworkPolicy
+metadata:
+  name: causal-ui-gym-network-policy
+  namespace: causal-ui-gym
+spec:
+  podSelector: {}
+  policyTypes:
+  - Ingress
+  - Egress
+  ingress:
+  - from:
+    - namespaceSelector:
+        matchLabels:
+          name: ingress-nginx
+    - namespaceSelector:
+        matchLabels:
+          name: monitoring
+  - from:
+    - podSelector: {}
+    ports:
+    - protocol: TCP
+      port: 80
+    - protocol: TCP
+      port: 8000
+    - protocol: TCP
+      port: 5432
+    - protocol: TCP
+      port: 6379
+  egress:
+  - to: []
+    ports:
+    - protocol: TCP
+      port: 53
+    - protocol: UDP
+      port: 53
+    - protocol: TCP
+      port: 443
+    - protocol: TCP
+      port: 80
+
+---
+# Pod Disruption Budget
+apiVersion: policy/v1
+kind: PodDisruptionBudget
+metadata:
+  name: causal-ui-gym-pdb
+  namespace: causal-ui-gym
+spec:
+  minAvailable: 2
+  selector:
+    matchLabels:
+      app: causal-ui-gym
+
+---
+# ServiceMonitor for Prometheus
+apiVersion: monitoring.coreos.com/v1
+kind: ServiceMonitor
+metadata:
+  name: causal-ui-gym-monitor
+  namespace: causal-ui-gym
+  labels:
+    app: causal-ui-gym
+    release: prometheus
+spec:
+  selector:
+    matchLabels:
+      app: causal-ui-gym
+  endpoints:
+  - port: api
+    path: /metrics
+    interval: 30s
+    scrapeTimeout: 10s
