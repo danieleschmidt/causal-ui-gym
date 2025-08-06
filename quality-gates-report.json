@@ -1,0 +1,123 @@
+{
+  "security": {
+    "status": "pass",
+    "score": 90,
+    "issues": [
+      "Sensitive file found: .env.example"
+    ],
+    "checks_performed": 13,
+    "recommendations": []
+  },
+  "performance": {
+    "status": "pass",
+    "score": 95,
+    "issues": [
+      "Unoptimized API calls in useEffect in src/hooks/usePerformanceOptimization.ts"
+    ],
+    "metrics": {
+      "caching_score": 100,
+      "concurrency_score": 100
+    },
+    "bundle_info": {
+      "size_mb": 0.1553955078125,
+      "file_count": 16,
+      "estimated_gzipped_mb": 0.04661865234375
+    },
+    "recommendations": []
+  },
+  "code_quality": {
+    "status": "fail",
+    "score": 0,
+    "issues": [
+      "Function with too many parameters in src/components/CausalGraph.tsx",
+      "Complex conditional statements in src/components/CausalGraph.tsx",
+      "Use of loose equality in src/components/CausalGraph.tsx",
+      "Non-deterministic date creation in src/components/ErrorBoundary.tsx",
+      "Function with too many parameters in src/components/ExperimentBuilder.tsx",
+      "Complex conditional statements in src/components/ExperimentBuilder.tsx",
+      "Use of loose equality in src/components/ExperimentBuilder.tsx",
+      "Non-deterministic date creation in src/components/ExperimentBuilder.tsx",
+      "Function with too many parameters in src/components/InterventionControl.tsx",
+      "Non-deterministic date creation in src/components/InterventionControl.tsx",
+      "Function with too many parameters in src/components/MetricsDashboard.tsx",
+      "Use of loose equality in src/components/MetricsDashboard.tsx",
+      "Function with too many parameters in src/hooks/usePerformanceOptimization.ts",
+      "Complex conditional statements in src/hooks/usePerformanceOptimization.ts",
+      "Use of loose equality in src/hooks/usePerformanceOptimization.ts",
+      "Use of loose equality in src/i18n/translations.ts",
+      "Complex conditional statements in src/utils/index.ts",
+      "Use of loose equality in src/utils/index.ts",
+      "Complex conditional statements in src/utils/metrics.ts",
+      "Use of loose equality in src/utils/metrics.ts",
+      "Non-deterministic date creation in src/utils/metrics.ts",
+      "Complex conditional statements in src/utils/validation.ts",
+      "Use of loose equality in src/utils/validation.ts",
+      "Complex conditional statements in src/utils/monitoring.ts",
+      "Use of loose equality in src/utils/monitoring.ts",
+      "Non-deterministic date creation in src/utils/monitoring.ts",
+      "Complex conditional statements in src/utils/cache.ts",
+      "Use of loose equality in src/utils/cache.ts",
+      "Non-deterministic date creation in src/utils/cache.ts",
+      "Use of var instead of let/const in backend/initialization.py",
+      "Use of loose equality in backend/initialization.py",
+      "Use of loose equality in backend/warmup.py",
+      "Use of loose equality in backend/api/websocket_manager.py",
+      "Use of loose equality in backend/cache/cache_manager.py",
+      "Use of var instead of let/const in backend/engine/causal_engine.py",
+      "Use of loose equality in backend/engine/causal_engine.py",
+      "Use of loose equality in backend/models/causal_models.py",
+      "Use of loose equality in backend/monitoring/health_monitor.py",
+      "Use of loose equality in backend/api/routes/agents.py",
+      "Use of loose equality in backend/api/routes/experiments.py",
+      "Low test coverage: 55.3%"
+    ],
+    "metrics": {
+      "typescript": 6216,
+      "python": 9724,
+      "total": 15940,
+      "test_coverage": 55.3
+    },
+    "recommendations": [
+      "Increase test coverage with unit and integration tests",
+      "Replace var declarations with let/const"
+    ]
+  },
+  "dependency_health": {
+    "status": "pass",
+    "score": 100,
+    "issues": [],
+    "total_dependencies": 31
+  },
+  "configuration": {
+    "status": "pass",
+    "score": 100,
+    "issues": [],
+    "missing_configs": []
+  },
+  "documentation": {
+    "status": "pass",
+    "score": 88,
+    "issues": [
+      "Low code documentation ratio: 43.8%"
+    ],
+    "missing_docs": [],
+    "code_doc_ratio": 0.4375
+  },
+  "build_integrity": {
+    "status": "pass",
+    "score": 85,
+    "issues": [
+      "Invalid tsconfig.json"
+    ]
+  },
+  "overall": {
+    "status": "warning",
+    "score": 79.7,
+    "failed_checks": [
+      "code_quality"
+    ],
+    "warning_checks": [],
+    "total_issues": 45
+  },
+  "execution_time": 0.171906
+}
