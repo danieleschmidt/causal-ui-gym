@@ -3,9 +3,9 @@
 
 # Core Framework
 fastapi[all]==0.104.1
-uvicorn[standard]==0.24.0
-pydantic==2.5.0
-pydantic-settings==2.1.0
+uvicorn[standard]==0.35.0
+pydantic==2.11.7
+pydantic-settings==2.10.1
 
 # ASGI Server
 gunicorn==21.2.0
