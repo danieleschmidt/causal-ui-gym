@@ -11,7 +11,7 @@ pydantic-settings==2.10.1
 gunicorn==21.2.0
 
 # Database
-psycopg2-binary==2.9.9
+psycopg2-binary==2.9.10
 alembic==1.13.1
 sqlalchemy==2.0.42
 
