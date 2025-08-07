@@ -90,7 +90,7 @@ aiofiles==23.2.1
 python-magic==0.4.27
 
 # Data Processing
-pandas==2.1.4
+pandas==2.3.1
 pyarrow==14.0.1
 
 # Image Processing (optional)
