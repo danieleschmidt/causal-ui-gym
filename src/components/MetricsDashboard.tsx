@@ -336,6 +336,94 @@ export function MetricsDashboard({
             </CardContent>
           </Card>
         </Grid>
+        {/* Advanced Metrics Tab */}
+        {selectedTab === 2 && (
+          <Grid item xs={12}>
+            <Card>
+              <CardContent>
+                <Typography variant="h6" gutterBottom>
+                  Advanced Causal Analytics
+                </Typography>
+                <Grid container spacing={3}>
+                  <Grid item xs={12} md={4}>
+                    <Paper sx={{ p: 2, textAlign: 'center' }}>
+                      <Typography variant="h4" color="primary">
+                        {formatMetricValue(
+                          (metricsData.causal_discovery_metrics?.reduce((a, b) => a + b, 0) || 0) / 
+                          (metricsData.causal_discovery_metrics?.length || 1), 'percentage', 1
+                        )}
+                      </Typography>
+                      <Typography variant="body2">Causal Discovery Accuracy</Typography>
+                    </Paper>
+                  </Grid>
+                  <Grid item xs={12} md={4}>
+                    <Paper sx={{ p: 2, textAlign: 'center' }}>
+                      <Typography variant="h4" color="secondary">
+                        {formatMetricValue(
+                          (metricsData.backdoor_identification_rates?.reduce((a, b) => a + b, 0) || 0) / 
+                          (metricsData.backdoor_identification_rates?.length || 1), 'percentage', 1
+                        )}
+                      </Typography>
+                      <Typography variant="body2">Backdoor Path Identification</Typography>
+                    </Paper>
+                  </Grid>
+                  <Grid item xs={12} md={4}>
+                    <Paper sx={{ p: 2, textAlign: 'center' }}>
+                      <Typography variant="h4" color="warning.main">
+                        {formatMetricValue(
+                          (metricsData.intervention_effectiveness?.reduce((a, b) => a + b, 0) || 0) / 
+                          (metricsData.intervention_effectiveness?.length || 1), 'decimal', 2
+                        )}
+                      </Typography>
+                      <Typography variant="body2">Intervention Effectiveness</Typography>
+                    </Paper>
+                  </Grid>
+                </Grid>
+              </CardContent>
+            </Card>
+          </Grid>
+        )}
+
+        {/* LLM Analysis Tab */}
+        {selectedTab === 3 && showLLMMetrics && (
+          <Grid item xs={12}>
+            <Card>
+              <CardContent>
+                <Typography variant="h6" gutterBottom>
+                  LLM Causal Reasoning Analysis
+                </Typography>
+                <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+                  Detailed analysis of how different language models perform on causal reasoning tasks.
+                </Typography>
+                
+                {/* LLM comparison would be rendered here */}
+                <Alert severity="info">
+                  LLM comparison metrics will be displayed here when multiple agents are configured and active.
+                </Alert>
+              </CardContent>
+            </Card>
+          </Grid>
+        )}
+
+        {/* Comparison Tab */}
+        {selectedTab === 4 && comparisonMode && (
+          <Grid item xs={12}>
+            <Card>
+              <CardContent>
+                <Typography variant="h6" gutterBottom>
+                  Agent Performance Comparison
+                </Typography>
+                <Typography variant="body2" color="text.secondary" sx={{ mb: 2 }}>
+                  Side-by-side comparison of different LLM agents' performance on causal reasoning tasks.
+                </Typography>
+                
+                <Alert severity="info">
+                  Agent comparison will be available when multiple LLM agents are active in the experiment.
+                </Alert>
+              </CardContent>
+            </Card>
+          </Grid>
+        )}
       </Grid>
     </Box>
   )
