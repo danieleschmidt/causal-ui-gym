@@ -41,6 +41,9 @@ class MessageType(Enum):
     ERROR = "error"
     NOTIFICATION = "notification"
     HEARTBEAT_ACK = "heartbeat_ack"
+    CAUSAL_FLOW_UPDATE = "causal_flow_update"
+    REALTIME_COMPUTATION = "realtime_computation"
+    GRAPH_LAYOUT_UPDATE = "graph_layout_update"
 
 
 @dataclass
@@ -433,7 +436,7 @@ class WebSocketManager:
 websocket_manager = WebSocketManager()
 
 
-# Convenience functions for broadcasting common events
+# Enhanced convenience functions for broadcasting common events
 async def broadcast_experiment_update(experiment_id: str, update_data: Dict[str, Any]) -> int:
     """Broadcast experiment update to subscribers."""
     message = WebSocketMessage(
@@ -444,6 +447,46 @@ async def broadcast_experiment_update(experiment_id: str, update_data: Dict[str,
         experiment_id=experiment_id
     )
     return await websocket_manager.broadcast_to_topic(f"experiment:{experiment_id}", message)
+
+
+async def broadcast_causal_flow_update(experiment_id: str, flow_data: Dict[str, Any]) -> int:
+    """Broadcast real-time causal flow visualization updates."""
+    message = WebSocketMessage(
+        type=MessageType.CAUSAL_FLOW_UPDATE,
+        data={
+            'flow_steps': flow_data.get('flow_steps', []),
+            'active_nodes': flow_data.get('active_nodes', []),
+            'intervention_effects': flow_data.get('intervention_effects', {}),
+            'animation_duration': flow_data.get('animation_duration', 1000),
+            'timestamp': datetime.now().isoformat()
+        },
+        timestamp=datetime.now(),
+        message_id=str(uuid.uuid4()),
+        experiment_id=experiment_id
+    )
+    return await websocket_manager.broadcast_to_topic(f"causal_flow:{experiment_id}", message)
+
+
+async def broadcast_realtime_computation(experiment_id: str, computation_data: Dict[str, Any]) -> int:
+    """Broadcast real-time causal computation results."""
+    message = WebSocketMessage(
+        type=MessageType.REALTIME_COMPUTATION,
+        data={
+            'ate_values': computation_data.get('ate_values', {}),
+            'confidence_intervals': computation_data.get('confidence_intervals', {}),
+            'backdoor_paths': computation_data.get('backdoor_paths', []),
+            'computation_time': computation_data.get('computation_time', 0),
+            'sample_size': computation_data.get('sample_size', 0),
+            'intervention_node': computation_data.get('intervention_node'),
+            'intervention_value': computation_data.get('intervention_value'),
+            'affected_outcomes': computation_data.get('affected_outcomes', {}),
+            'timestamp': datetime.now().isoformat()
+        },
+        timestamp=datetime.now(),
+        message_id=str(uuid.uuid4()),
+        experiment_id=experiment_id
+    )
+    return await websocket_manager.broadcast_to_topic(f"realtime:{experiment_id}", message)
 
 
 async def broadcast_metrics_update(experiment_id: str, metrics_data: Dict[str, Any]) -> int:
@@ -459,12 +502,221 @@ async def broadcast_metrics_update(experiment_id: str, metrics_data: Dict[str, A
 
 
 async def send_intervention_result(user_id: str, intervention_data: Dict[str, Any]) -> int:
-    """Send intervention result to a specific user."""
+    """Send enhanced intervention result to a specific user."""
     message = WebSocketMessage(
         type=MessageType.INTERVENTION_RESULT,
-        data=intervention_data,
+        data={
+            **intervention_data,
+            'success': intervention_data.get('success', True),
+            'computation_time': intervention_data.get('computation_time', 0),
+            'affected_variables': intervention_data.get('affected_variables', []),
+            'causal_effects': intervention_data.get('causal_effects', {}),
+            'validation_results': intervention_data.get('validation_results', {}),
+            'recommendations': intervention_data.get('recommendations', []),
+            'timestamp': datetime.now().isoformat()
+        },
         timestamp=datetime.now(),
         message_id=str(uuid.uuid4()),
         user_id=user_id
     )
     return await websocket_manager.send_to_user(user_id, message)
+
+
+async def send_graph_layout_update(experiment_id: str, layout_data: Dict[str, Any]) -> int:
+    """Send optimized graph layout updates for better visualization."""
+    message = WebSocketMessage(
+        type=MessageType.GRAPH_LAYOUT_UPDATE,
+        data={
+            'nodes': layout_data.get('nodes', []),
+            'edges': layout_data.get('edges', []),
+            'layout_algorithm': layout_data.get('layout_algorithm', 'force_directed'),
+            'optimization_score': layout_data.get('optimization_score', 0),
+            'suggested_interventions': layout_data.get('suggested_interventions', []),
+            'complexity_metrics': layout_data.get('complexity_metrics', {}),
+            'timestamp': datetime.now().isoformat()
+        },
+        timestamp=datetime.now(),
+        message_id=str(uuid.uuid4()),
+        experiment_id=experiment_id
+    )
+    return await websocket_manager.broadcast_to_topic(f"layout:{experiment_id}", message)
+
+
+class RealtimeCausalComputation:
+    """Manages real-time causal computation and WebSocket updates."""
+    
+    def __init__(self, causal_engine):
+        self.causal_engine = causal_engine
+        self.active_computations: Dict[str, asyncio.Task] = {}
+        self.computation_cache: Dict[str, Dict[str, Any]] = {}
+        
+    async def start_realtime_computation(self, experiment_id: str, dag, intervention_stream):
+        """Start real-time causal computation for an experiment."""
+        if experiment_id in self.active_computations:
+            self.active_computations[experiment_id].cancel()
+        
+        task = asyncio.create_task(
+            self._realtime_computation_loop(experiment_id, dag, intervention_stream)
+        )
+        self.active_computations[experiment_id] = task
+        return task
+    
+    async def _realtime_computation_loop(self, experiment_id: str, dag, intervention_stream):
+        """Main loop for real-time causal computation."""
+        try:
+            async for intervention in intervention_stream:
+                # Compute causal effects
+                start_time = time.time()
+                
+                # Run multiple causal computations in parallel
+                tasks = [
+                    self._compute_intervention_effect(dag, intervention),
+                    self._identify_backdoor_paths(dag, intervention),
+                    self._compute_confounding_effects(dag, intervention),
+                    self._suggest_optimal_interventions(dag, intervention)
+                ]
+                
+                results = await asyncio.gather(*tasks, return_exceptions=True)
+                computation_time = time.time() - start_time
+                
+                # Prepare computation data
+                computation_data = {
+                    'intervention_effect': results[0] if not isinstance(results[0], Exception) else None,
+                    'backdoor_paths': results[1] if not isinstance(results[1], Exception) else [],
+                    'confounding_effects': results[2] if not isinstance(results[2], Exception) else {},
+                    'suggested_interventions': results[3] if not isinstance(results[3], Exception) else [],
+                    'computation_time': computation_time,
+                    'intervention_node': intervention.get('node'),
+                    'intervention_value': intervention.get('value'),
+                    'sample_size': intervention.get('sample_size', 10000)
+                }
+                
+                # Cache results
+                cache_key = f"{intervention.get('node')}:{intervention.get('value')}"
+                self.computation_cache[cache_key] = computation_data
+                
+                # Broadcast to WebSocket subscribers
+                await broadcast_realtime_computation(experiment_id, computation_data)
+                
+                # Broadcast causal flow visualization
+                flow_data = self._generate_causal_flow_data(dag, intervention, computation_data)
+                await broadcast_causal_flow_update(experiment_id, flow_data)
+                
+        except asyncio.CancelledError:
+            logger.info(f"Realtime computation cancelled for experiment {experiment_id}")
+        except Exception as e:
+            logger.error(f"Error in realtime computation for {experiment_id}: {e}")
+    
+    async def _compute_intervention_effect(self, dag, intervention):
+        """Compute intervention effect using causal engine."""
+        from ..engine.causal_engine import Intervention
+        
+        causal_intervention = Intervention(
+            variable=intervention['node'],
+            value=intervention['value']
+        )
+        
+        # Compute effects on all other variables
+        effects = {}
+        for node in dag.nodes:
+            if node.id != intervention['node']:
+                try:
+                    result = self.causal_engine.compute_intervention(
+                        dag, causal_intervention, node.id, n_samples=5000  # Reduced for real-time
+                    )
+                    effects[node.id] = {
+                        'mean_effect': float(result.outcome_distribution.mean()),
+                        'std_effect': float(result.outcome_distribution.std()),
+                        'computation_time': result.computation_time
+                    }
+                except Exception as e:
+                    logger.error(f"Error computing intervention effect on {node.id}: {e}")
+                    effects[node.id] = {'error': str(e)}
+        
+        return effects
+    
+    async def _identify_backdoor_paths(self, dag, intervention):
+        """Identify backdoor paths for the intervention."""
+        backdoor_paths = []
+        
+        for node in dag.nodes:
+            if node.id != intervention['node']:
+                try:
+                    paths = self.causal_engine.identify_backdoor_paths(
+                        dag, intervention['node'], node.id
+                    )
+                    if paths:
+                        backdoor_paths.extend(paths)
+                except Exception as e:
+                    logger.error(f"Error identifying backdoor paths: {e}")
+        
+        return backdoor_paths
+    
+    async def _compute_confounding_effects(self, dag, intervention):
+        """Compute potential confounding effects."""
+        # This would implement more sophisticated confounding analysis
+        return {
+            'potential_confounders': [],
+            'adjustment_recommendations': [],
+            'bias_estimates': {}
+        }
+    
+    async def _suggest_optimal_interventions(self, dag, intervention):
+        """Suggest optimal follow-up interventions."""
+        # This would implement intervention optimization logic
+        return [
+            {
+                'variable': 'suggested_var',
+                'value': 1.5,
+                'expected_effect': 0.3,
+                'confidence': 0.85,
+                'rationale': 'Maximizes outcome while minimizing side effects'
+            }
+        ]
+    
+    def _generate_causal_flow_data(self, dag, intervention, computation_data):
+        """Generate causal flow visualization data."""
+        flow_steps = []
+        active_nodes = [intervention['node']]
+        
+        # Generate flow steps based on causal structure
+        for edge in dag.edges:
+            if edge.source == intervention['node']:
+                flow_steps.append({
+                    'id': f"flow_{edge.source}_{edge.target}",
+                    'source': edge.source,
+                    'target': edge.target,
+                    'strength': abs(edge.weight or 1.0),
+                    'delay': 200 * len(flow_steps),
+                    'effect_size': computation_data['intervention_effect'].get(edge.target, {}).get('mean_effect', 0)
+                })
+                active_nodes.append(edge.target)
+        
+        return {
+            'flow_steps': flow_steps,
+            'active_nodes': active_nodes,
+            'intervention_effects': computation_data['intervention_effect'],
+            'animation_duration': 1000
+        }
+    
+    def stop_computation(self, experiment_id: str):
+        """Stop real-time computation for an experiment."""
+        if experiment_id in self.active_computations:
+            self.active_computations[experiment_id].cancel()
+            del self.active_computations[experiment_id]
+    
+    def get_cached_result(self, node: str, value: float) -> Optional[Dict[str, Any]]:
+        """Get cached computation result."""
+        cache_key = f"{node}:{value}"
+        return self.computation_cache.get(cache_key)
+
+
+# Global realtime computation manager
+realtime_computation_manager = None
+
+
+def initialize_realtime_computation(causal_engine):
+    """Initialize the global realtime computation manager."""
+    global realtime_computation_manager
+    realtime_computation_manager = RealtimeCausalComputation(causal_engine)
+    return realtime_computation_manager

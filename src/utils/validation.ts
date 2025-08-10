@@ -1,5 +1,29 @@
 import { CausalDAG, CausalNode, CausalEdge, Intervention, ExperimentConfig } from '../types'
 
+// Enhanced security and sanitization utilities
+export interface SanitizationConfig {
+  allowHtml?: boolean
+  maxLength?: number
+  allowedChars?: RegExp
+  stripTags?: boolean
+  escapeHtml?: boolean
+}
+
+export interface SecurityValidationResult {
+  isSecure: boolean
+  threats: SecurityThreat[]
+  sanitized: string
+  riskLevel: 'low' | 'medium' | 'high' | 'critical'
+}
+
+export interface SecurityThreat {
+  type: 'xss' | 'injection' | 'path_traversal' | 'malformed_data' | 'excessive_length'
+  description: string
+  severity: 'low' | 'medium' | 'high' | 'critical'
+  position?: number
+  suggestion: string
+}
+
 export interface ValidationRule<T> {
   name: string
   description: string
@@ -518,16 +542,323 @@ function generateExperimentSuggestions(ruleName: string, config: ExperimentConfi
   }
 }
 
-// Utility function for batch validation
+// Enhanced security validation and sanitization functions
+export function sanitizeInput(
+  input: string, 
+  config: SanitizationConfig = {}
+): SecurityValidationResult {
+  const threats: SecurityThreat[] = []
+  let sanitized = input
+  let riskLevel: 'low' | 'medium' | 'high' | 'critical' = 'low'
+
+  // Check for excessive length
+  const maxLength = config.maxLength || 10000
+  if (input.length > maxLength) {
+    threats.push({
+      type: 'excessive_length',
+      description: `Input exceeds maximum length of ${maxLength} characters`,
+      severity: 'medium',
+      suggestion: `Truncate input to ${maxLength} characters`
+    })
+    sanitized = sanitized.substring(0, maxLength)
+    riskLevel = 'medium'
+  }
+
+  // Check for XSS patterns
+  const xssPatterns = [
+    /<script[^>]*>.*?<\/script>/gi,
+    /javascript:/gi,
+    /on\w+\s*=/gi,
+    /<iframe[^>]*>.*?<\/iframe>/gi,
+    /<object[^>]*>.*?<\/object>/gi,
+    /<embed[^>]*>.*?<\/embed>/gi,
+    /vbscript:/gi,
+    /data:text\/html/gi
+  ]
+
+  xssPatterns.forEach((pattern, index) => {
+    const matches = sanitized.match(pattern)
+    if (matches) {
+      threats.push({
+        type: 'xss',
+        description: `Potential XSS pattern detected: ${matches[0].substring(0, 50)}...`,
+        severity: 'high',
+        suggestion: 'Remove or escape potentially dangerous HTML/JavaScript content'
+      })
+      sanitized = sanitized.replace(pattern, '')
+      riskLevel = 'high'
+    }
+  })
+
+  // Check for SQL injection patterns (even though we're not using SQL directly)
+  const injectionPatterns = [
+    /('|(\-\-)|;|\||\*|%)/gi,
+    /(union|select|insert|delete|drop|create|alter|exec|execute)/gi
+  ]
+
+  injectionPatterns.forEach(pattern => {
+    if (pattern.test(sanitized)) {
+      threats.push({
+        type: 'injection',
+        description: 'Potential injection pattern detected',
+        severity: 'medium',
+        suggestion: 'Remove special characters that could be used for injection attacks'
+      })
+      riskLevel = Math.max(riskLevel === 'low' ? 'medium' : riskLevel, 'medium') as any
+    }
+  })
+
+  // Check for path traversal patterns
+  if (/(\.\.\/|\.\.\\\.\.)/.test(sanitized)) {
+    threats.push({
+      type: 'path_traversal',
+      description: 'Path traversal pattern detected',
+      severity: 'high',
+      suggestion: 'Remove directory traversal sequences'
+    })
+    sanitized = sanitized.replace(/(\.\.\/|\.\.\\\.\.).*/g, '')
+    riskLevel = 'high'
+  }
+
+  // Apply character restrictions
+  if (config.allowedChars) {
+    const originalLength = sanitized.length
+    // Create a negated character class by removing the outer brackets and negating
+    const source = config.allowedChars.source.replace(/^\[|\]$/g, '')
+    const allowedPattern = new RegExp(`[^${source}]`, 'g')
+    sanitized = sanitized.replace(allowedPattern, '')
+    if (sanitized.length < originalLength) {
+      threats.push({
+        type: 'malformed_data',
+        description: 'Input contains disallowed characters',
+        severity: 'low',
+        suggestion: 'Only use allowed characters as specified'
+      })
+    }
+  }
+
+  // HTML handling
+  if (config.stripTags || config.escapeHtml) {
+    if (config.stripTags) {
+      sanitized = sanitized.replace(/<[^>]*>/g, '')
+    } else if (config.escapeHtml) {
+      sanitized = sanitized
+        .replace(/&/g, '&amp;')
+        .replace(/</g, '&lt;')
+        .replace(/>/g, '&gt;')
+        .replace(/"/g, '&quot;')
+        .replace(/'/g, '&#x27;')
+        .replace(/\//g, '&#x2F;')
+    }
+  }
+
+  return {
+    isSecure: threats.length === 0,
+    threats,
+    sanitized,
+    riskLevel
+  }
+}
+
+// Sanitize DAG input with security validation
+export function sanitizeDAG(dag: CausalDAG): { sanitized: CausalDAG; threats: SecurityThreat[] } {
+  const allThreats: SecurityThreat[] = []
+  
+  // Sanitize DAG name and description
+  const nameValidation = sanitizeInput(dag.name || '', {
+    maxLength: 200,
+    stripTags: true,
+    allowedChars: /[a-zA-Z0-9\s\-_]/
+  })
+  allThreats.push(...nameValidation.threats)
+  
+  const descValidation = sanitizeInput(dag.description || '', {
+    maxLength: 1000,
+    stripTags: true
+  })
+  allThreats.push(...descValidation.threats)
+  
+  // Sanitize nodes
+  const sanitizedNodes = dag.nodes.map(node => {
+    const idValidation = sanitizeInput(node.id, {
+      maxLength: 50,
+      stripTags: true,
+      allowedChars: /[a-zA-Z0-9_]/
+    })
+    allThreats.push(...idValidation.threats)
+    
+    const labelValidation = sanitizeInput(node.label || '', {
+      maxLength: 100,
+      stripTags: true
+    })
+    allThreats.push(...labelValidation.threats)
+    
+    const descValidation = sanitizeInput(node.description || '', {
+      maxLength: 500,
+      stripTags: true
+    })
+    allThreats.push(...descValidation.threats)
+    
+    return {
+      ...node,
+      id: idValidation.sanitized,
+      label: labelValidation.sanitized,
+      description: descValidation.sanitized
+    }
+  })
+  
+  return {
+    sanitized: {
+      ...dag,
+      name: nameValidation.sanitized,
+      description: descValidation.sanitized,
+      nodes: sanitizedNodes
+    },
+    threats: allThreats
+  }
+}
+
+// Sanitize experiment configuration
+export function sanitizeExperimentConfig(config: ExperimentConfig): {
+  sanitized: ExperimentConfig
+  threats: SecurityThreat[]
+} {
+  const allThreats: SecurityThreat[] = []
+  
+  // Sanitize basic fields
+  const nameValidation = sanitizeInput(config.name, {
+    maxLength: 200,
+    stripTags: true,
+    allowedChars: /[a-zA-Z0-9\s\-_]/
+  })
+  allThreats.push(...nameValidation.threats)
+  
+  const descValidation = sanitizeInput(config.description || '', {
+    maxLength: 2000,
+    stripTags: true
+  })
+  allThreats.push(...descValidation.threats)
+  
+  // Sanitize DAG if present
+  let sanitizedDAG = config.dag
+  if (config.dag) {
+    const dagSanitization = sanitizeDAG(config.dag)
+    sanitizedDAG = dagSanitization.sanitized
+    allThreats.push(...dagSanitization.threats)
+  }
+  
+  // Sanitize interventions
+  const sanitizedInterventions = config.interventions.map(intervention => {
+    const variableValidation = sanitizeInput(intervention.variable, {
+      maxLength: 50,
+      stripTags: true,
+      allowedChars: /[a-zA-Z0-9_]/
+    })
+    allThreats.push(...variableValidation.threats)
+    
+    const descValidation = sanitizeInput(intervention.description || '', {
+      maxLength: 500,
+      stripTags: true
+    })
+    allThreats.push(...descValidation.threats)
+    
+    // Validate intervention value for potential injection
+    if (typeof intervention.value === 'string') {
+      const valueValidation = sanitizeInput(intervention.value, {
+        maxLength: 100,
+        stripTags: true
+      })
+      allThreats.push(...valueValidation.threats)
+    }
+    
+    return {
+      ...intervention,
+      variable: variableValidation.sanitized,
+      description: descValidation.sanitized
+    }
+  })
+  
+  // Sanitize outcome variables
+  const sanitizedOutcomeVariables = config.outcome_variables.map(variable => {
+    const validation = sanitizeInput(variable, {
+      maxLength: 50,
+      stripTags: true,
+      allowedChars: /[a-zA-Z0-9_]/
+    })
+    allThreats.push(...validation.threats)
+    return validation.sanitized
+  })
+  
+  return {
+    sanitized: {
+      ...config,
+      name: nameValidation.sanitized,
+      description: descValidation.sanitized,
+      dag: sanitizedDAG,
+      interventions: sanitizedInterventions,
+      outcome_variables: sanitizedOutcomeVariables
+    },
+    threats: allThreats
+  }
+}
+
+// Rate limiting utilities
+const rateLimitStore = new Map<string, { count: number; resetTime: number }>()
+
+export function checkRateLimit(
+  identifier: string,
+  maxRequests: number = 100,
+  windowMs: number = 60000
+): { allowed: boolean; remaining: number; resetTime: number } {
+  const now = Date.now()
+  const key = identifier
+  
+  let bucket = rateLimitStore.get(key)
+  
+  if (!bucket || now > bucket.resetTime) {
+    bucket = {
+      count: 0,
+      resetTime: now + windowMs
+    }
+    rateLimitStore.set(key, bucket)
+  }
+  
+  if (bucket.count >= maxRequests) {
+    return {
+      allowed: false,
+      remaining: 0,
+      resetTime: bucket.resetTime
+    }
+  }
+  
+  bucket.count++
+  
+  return {
+    allowed: true,
+    remaining: maxRequests - bucket.count,
+    resetTime: bucket.resetTime
+  }
+}
+
+// Input size validation
+export function validateInputSize(input: any, maxSizeBytes: number = 1024 * 1024): boolean {
+  const size = new Blob([JSON.stringify(input)]).size
+  return size <= maxSizeBytes
+}
+
+// Utility function for batch validation with security
 export function validateBatch<T>(
   items: T[],
-  validator: (item: T) => ValidationResult
-): ValidationResult {
+  validator: (item: T) => ValidationResult,
+  securityValidator?: (item: T) => SecurityValidationResult
+): ValidationResult & { securityThreats: SecurityThreat[] } {
   const allErrors: ValidationError[] = []
   const allWarnings: ValidationError[] = []
+  const allSecurityThreats: SecurityThreat[] = []
   let totalScore = 0
 
   items.forEach((item, index) => {
+    // Standard validation
     const result = validator(item)
     
     result.errors.forEach(error => {
@@ -544,13 +875,20 @@ export function validateBatch<T>(
       })
     })
     
+    // Security validation
+    if (securityValidator) {
+      const securityResult = securityValidator(item)
+      allSecurityThreats.push(...securityResult.threats)
+    }
+    
     totalScore += result.score
   })
 
   return {
-    isValid: allErrors.length === 0,
+    isValid: allErrors.length === 0 && allSecurityThreats.filter(t => t.severity === 'critical' || t.severity === 'high').length === 0,
     errors: allErrors,
     warnings: allWarnings,
-    score: items.length > 0 ? Math.round(totalScore / items.length) : 100
+    score: items.length > 0 ? Math.round(totalScore / items.length) : 100,
+    securityThreats: allSecurityThreats
   }
 }

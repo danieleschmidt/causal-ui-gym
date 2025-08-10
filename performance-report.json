@@ -1,0 +1,43 @@
+{
+  "timestamp": 1754810803.864263,
+  "total_tests": 4,
+  "successful_tests": 4,
+  "average_duration_ms": 0.7474314999171838,
+  "max_memory_mb": 0.101,
+  "performance_grade": "A",
+  "recommendations": [],
+  "detailed_results": [
+    {
+      "test_name": "causal_dag_creation",
+      "duration_ms": 0.6345689998852322,
+      "memory_mb": 0.099,
+      "cpu_percent": 0.0,
+      "success": true,
+      "error": ""
+    },
+    {
+      "test_name": "intervention_computation",
+      "duration_ms": 0.8948189997681766,
+      "memory_mb": 0.101,
+      "cpu_percent": 0.0,
+      "success": true,
+      "error": ""
+    },
+    {
+      "test_name": "data_preprocessing",
+      "duration_ms": 1.153949000126886,
+      "memory_mb": 0.0,
+      "cpu_percent": 0.0,
+      "success": true,
+      "error": ""
+    },
+    {
+      "test_name": "metrics_calculation",
+      "duration_ms": 0.3063889998884406,
+      "memory_mb": -0.001,
+      "cpu_percent": 0.0,
+      "success": true,
+      "error": ""
+    }
+  ]
+}
