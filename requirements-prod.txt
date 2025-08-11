@@ -91,7 +91,7 @@ python-magic==0.4.27
 
 # Data Processing
 pandas==2.3.1
-pyarrow==14.0.1
+pyarrow==21.0.0
 
 # Image Processing (optional)
 pillow==10.1.0
