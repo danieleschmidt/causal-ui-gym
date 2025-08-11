@@ -94,7 +94,7 @@ pandas==2.3.1
 pyarrow==14.0.1
 
 # Image Processing (optional)
-pillow==10.1.0
+pillow==11.3.0
 
 # PDF Processing (optional)
 pypdf2==3.0.1
