@@ -60,7 +60,7 @@ pytz==2023.3
 
 # Validation
 email-validator==2.1.0.post1
-phonenumbers==8.13.26
+phonenumbers==9.0.11
 
 # Async Support
 asyncio-mqtt==0.16.1
