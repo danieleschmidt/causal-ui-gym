@@ -8,7 +8,7 @@ pydantic==2.11.7
 pydantic-settings==2.10.1
 
 # ASGI Server
-gunicorn==21.2.0
+gunicorn==23.0.0
 
 # Database
 psycopg2-binary==2.9.10
