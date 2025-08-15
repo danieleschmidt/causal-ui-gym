@@ -20,7 +20,7 @@ redis==5.0.1
 hiredis==2.2.3
 
 # Scientific Computing
-numpy==1.24.4
+numpy==1.26.4
 jax[cpu]==0.4.30
 jaxlib==0.4.30
 
