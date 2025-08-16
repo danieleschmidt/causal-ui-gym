@@ -514,6 +514,268 @@ class JaxCausalEngine:
             computation_time=computation_time
         )
     
+    def compute_pearl_causal_hierarchy(
+        self,
+        dag: CausalDAG,
+        treatment: str,
+        outcome: str,
+        query_type: str = "ate",  # 'ate', 'cate', 'mediation', 'counterfactual'
+        n_samples: int = 10000
+    ) -> Dict[str, CausalResult]:
+        """
+        Compute causal effects using Pearl's Causal Hierarchy (Association, Intervention, Counterfactuals).
+        
+        This method implements the three levels of Pearl's causal hierarchy:
+        1. Association (P(Y|X)) - observational correlations
+        2. Intervention (P(Y|do(X))) - causal effects under interventions  
+        3. Counterfactuals (P(Y_x|X',Y')) - what would have happened
+        
+        Args:
+            dag: Causal DAG structure
+            treatment: Treatment variable name
+            outcome: Outcome variable name
+            query_type: Type of causal query to perform
+            n_samples: Number of samples for estimation
+            
+        Returns:
+            Dictionary containing results for each level of the hierarchy
+        """
+        import time
+        start_time = time.time()
+        
+        results = {}
+        
+        # Level 1: Association P(Y|X)
+        association_result = self._compute_association(dag, treatment, outcome, n_samples)
+        results['association'] = association_result
+        
+        # Level 2: Intervention P(Y|do(X))
+        intervention_result = self.compute_ate(dag, treatment, outcome, n_samples=n_samples)
+        results['intervention'] = intervention_result
+        
+        # Level 3: Counterfactuals P(Y_x|X',Y')
+        counterfactual_result = self._compute_counterfactuals(dag, treatment, outcome, n_samples)
+        results['counterfactual'] = counterfactual_result
+        
+        # Mediation analysis if requested
+        if query_type == "mediation":
+            mediation_result = self._compute_mediation_analysis(dag, treatment, outcome, n_samples)
+            results['mediation'] = mediation_result
+            
+        computation_time = time.time() - start_time
+        
+        # Add meta-result with computation summary
+        results['meta'] = CausalResult(
+            intervention=Intervention(variable="meta", value=0),
+            outcome_distribution=jnp.array([]),
+            computation_time=computation_time,
+            ate=None
+        )
+        
+        return results
+    
+    @partial(jit, static_argnums=(0,))
+    def _compute_association(
+        self,
+        dag: CausalDAG,
+        treatment: str,
+        outcome: str,
+        n_samples: int
+    ) -> CausalResult:
+        """
+        Compute Level 1: Association P(Y|X) - observational correlation.
+        """
+        import time
+        start_time = time.time()
+        
+        treatment_idx = dag.nodes.index(treatment)
+        outcome_idx = dag.nodes.index(outcome)
+        adjacency_matrix = self._dag_to_adjacency_matrix(dag)
+        
+        # Generate observational data (no interventions)
+        self.key, subkey = random.split(self.key)
+        noise_samples = random.normal(subkey, (len(dag.nodes), n_samples))
+        
+        intervention_mask = jnp.zeros(len(dag.nodes), dtype=bool)
+        intervention_values = jnp.zeros(len(dag.nodes))
+        
+        variables = self._compute_linear_scm(
+            adjacency_matrix, noise_samples, intervention_mask, intervention_values
+        )
+        
+        observed_treatment = variables[treatment_idx, :]
+        observed_outcome = variables[outcome_idx, :]
+        
+        # Compute correlation coefficient as association measure
+        association_strength = jnp.corrcoef(observed_treatment, observed_outcome)[0, 1]
+        
+        computation_time = time.time() - start_time
+        
+        return CausalResult(
+            intervention=Intervention(variable=treatment, value=0),
+            outcome_distribution=observed_outcome,
+            ate=float(association_strength),
+            computation_time=computation_time
+        )
+    
+    def _compute_counterfactuals(
+        self,
+        dag: CausalDAG,
+        treatment: str,
+        outcome: str,
+        n_samples: int
+    ) -> CausalResult:
+        """
+        Compute Level 3: Counterfactuals P(Y_x|X',Y') - what would have happened.
+        """
+        import time
+        start_time = time.time()
+        
+        treatment_idx = dag.nodes.index(treatment)
+        outcome_idx = dag.nodes.index(outcome)
+        adjacency_matrix = self._dag_to_adjacency_matrix(dag)
+        
+        # Generate observational data first
+        self.key, subkey = random.split(self.key)
+        noise_samples = random.normal(subkey, (len(dag.nodes), n_samples))
+        
+        # Compute factual outcomes (what actually happened)
+        intervention_mask = jnp.zeros(len(dag.nodes), dtype=bool)
+        intervention_values = jnp.zeros(len(dag.nodes))
+        
+        factual_variables = self._compute_linear_scm(
+            adjacency_matrix, noise_samples, intervention_mask, intervention_values
+        )
+        
+        # Compute counterfactual outcomes (what would have happened)
+        # For individuals who received treatment=0, what if they had treatment=1?
+        counterfactual_outcomes = []
+        
+        for i in range(min(1000, n_samples)):  # Sample subset for efficiency
+            factual_treatment = factual_variables[treatment_idx, i]
+            
+            if factual_treatment < 0.5:  # Originally untreated
+                # Counterfactual: what if they were treated?
+                cf_intervention_mask = jnp.zeros(len(dag.nodes), dtype=bool)
+                cf_intervention_mask = cf_intervention_mask.at[treatment_idx].set(True)
+                cf_intervention_values = jnp.zeros(len(dag.nodes))
+                cf_intervention_values = cf_intervention_values.at[treatment_idx].set(1.0)
+                
+                # Use same noise for counterfactual consistency
+                cf_variables = self._compute_linear_scm(
+                    adjacency_matrix, noise_samples[:, i:i+1], cf_intervention_mask, cf_intervention_values
+                )
+                
+                counterfactual_outcomes.append(float(cf_variables[outcome_idx, 0]))
+        
+        # Individual Treatment Effect (ITE) distribution
+        counterfactual_dist = jnp.array(counterfactual_outcomes)
+        individual_effects = counterfactual_dist - factual_variables[outcome_idx, :len(counterfactual_outcomes)]
+        average_ite = jnp.mean(individual_effects)
+        
+        computation_time = time.time() - start_time
+        
+        return CausalResult(
+            intervention=Intervention(variable=treatment, value=1),
+            outcome_distribution=counterfactual_dist,
+            ate=float(average_ite),
+            computation_time=computation_time
+        )
+    
+    def _compute_mediation_analysis(
+        self,
+        dag: CausalDAG,
+        treatment: str,
+        outcome: str,
+        n_samples: int
+    ) -> CausalResult:
+        """
+        Compute mediation analysis to decompose total effect into direct and indirect effects.
+        """
+        import time
+        start_time = time.time()
+        
+        # Find potential mediators (variables causally between treatment and outcome)
+        potential_mediators = []
+        for node in dag.nodes:
+            if node != treatment and node != outcome:
+                # Check if treatment -> mediator -> outcome path exists
+                treatment_to_mediator = any(edge[0] == treatment and edge[1] == node for edge in dag.edges)
+                mediator_to_outcome = any(edge[0] == node and edge[1] == outcome for edge in dag.edges)
+                if treatment_to_mediator and mediator_to_outcome:
+                    potential_mediators.append(node)
+        
+        if not potential_mediators:
+            # No mediators found, return total effect only
+            total_effect = self.compute_ate(dag, treatment, outcome, n_samples=n_samples)
+            return total_effect
+        
+        # Use first mediator for demonstration (could be extended to multiple mediators)
+        mediator = potential_mediators[0]
+        
+        # Decompose effects using causal mediation formulas:
+        # Total Effect = Direct Effect + Indirect Effect
+        # Direct Effect: effect of treatment on outcome not through mediator
+        # Indirect Effect: effect of treatment on outcome through mediator
+        
+        treatment_idx = dag.nodes.index(treatment)
+        outcome_idx = dag.nodes.index(outcome)
+        mediator_idx = dag.nodes.index(mediator)
+        
+        adjacency_matrix = self._dag_to_adjacency_matrix(dag)
+        
+        # Generate samples
+        self.key, subkey = random.split(self.key)
+        noise_samples = random.normal(subkey, (len(dag.nodes), n_samples))
+        
+        # Total effect: P(Y|do(T=1)) - P(Y|do(T=0))
+        outcome_t1 = self._compute_intervention_distribution(
+            adjacency_matrix, noise_samples, treatment_idx, 1.0, outcome_idx
+        )
+        outcome_t0 = self._compute_intervention_distribution(
+            adjacency_matrix, noise_samples, treatment_idx, 0.0, outcome_idx
+        )
+        total_effect = jnp.mean(outcome_t1 - outcome_t0)
+        
+        # Natural Direct Effect (NDE): effect with mediator set to its natural value under control
+        mediator_t0 = self._compute_intervention_distribution(
+            adjacency_matrix, noise_samples, treatment_idx, 0.0, mediator_idx
+        )
+        
+        # Compute Y under T=1, M=M(0)
+        nde_outcomes = []
+        for i in range(min(1000, n_samples)):
+            m_val = mediator_t0[i]
+            
+            # Set both treatment=1 and mediator=M(0)
+            intervention_mask = jnp.zeros(len(dag.nodes), dtype=bool)
+            intervention_mask = intervention_mask.at[treatment_idx].set(True)
+            intervention_mask = intervention_mask.at[mediator_idx].set(True)
+            
+            intervention_values = jnp.zeros(len(dag.nodes))
+            intervention_values = intervention_values.at[treatment_idx].set(1.0)
+            intervention_values = intervention_values.at[mediator_idx].set(m_val)
+            
+            variables = self._compute_linear_scm(
+                adjacency_matrix, noise_samples[:, i:i+1], intervention_mask, intervention_values
+            )
+            nde_outcomes.append(float(variables[outcome_idx, 0]))
+        
+        nde = jnp.mean(jnp.array(nde_outcomes)) - jnp.mean(outcome_t0[:len(nde_outcomes)])
+        
+        # Natural Indirect Effect (NIE) = Total Effect - Natural Direct Effect
+        nie = total_effect - nde
+        
+        computation_time = time.time() - start_time
+        
+        return CausalResult(
+            intervention=Intervention(variable=f"{treatment}_mediated_by_{mediator}", value=1),
+            outcome_distribution=jnp.array(nde_outcomes),
+            ate=float(total_effect),
+            computation_time=computation_time,
+            confidence_interval=(float(nde), float(nie))  # Store direct and indirect effects
+        )
+    
     def compute_conditional_ate(
         self,
         dag: CausalDAG,
@@ -784,3 +1046,331 @@ class JaxCausalEngine:
                 continue
                 
         return True
+    
+    def compute_instrumental_variable_estimate(
+        self,
+        dag: CausalDAG,
+        instrument: str,
+        treatment: str,
+        outcome: str,
+        n_samples: int = 10000
+    ) -> CausalResult:
+        """
+        Compute causal effect using instrumental variable estimation.
+        
+        An instrumental variable Z satisfies:
+        1. Z affects T (relevance)
+        2. Z affects Y only through T (exclusion restriction)
+        3. Z is independent of unmeasured confounders (exchangeability)
+        
+        Args:
+            dag: Causal DAG structure
+            instrument: Instrumental variable name
+            treatment: Treatment variable name
+            outcome: Outcome variable name
+            n_samples: Number of samples for estimation
+            
+        Returns:
+            CausalResult with IV-estimated causal effect
+        """
+        import time
+        start_time = time.time()
+        
+        # Convert to indices
+        instrument_idx = dag.nodes.index(instrument)
+        treatment_idx = dag.nodes.index(treatment)
+        outcome_idx = dag.nodes.index(outcome)
+        
+        adjacency_matrix = self._dag_to_adjacency_matrix(dag)
+        
+        # Generate observational data
+        self.key, subkey = random.split(self.key)
+        noise_samples = random.normal(subkey, (len(dag.nodes), n_samples))
+        
+        intervention_mask = jnp.zeros(len(dag.nodes), dtype=bool)
+        intervention_values = jnp.zeros(len(dag.nodes))
+        
+        variables = self._compute_linear_scm(
+            adjacency_matrix, noise_samples, intervention_mask, intervention_values
+        )
+        
+        # Extract observed variables
+        z_obs = variables[instrument_idx, :]
+        t_obs = variables[treatment_idx, :]
+        y_obs = variables[outcome_idx, :]
+        
+        # Two-Stage Least Squares (2SLS) estimation
+        # Stage 1: Regress T on Z
+        # T = α + βZ + error
+        
+        # Compute coefficients using closed-form solutions
+        z_mean = jnp.mean(z_obs)
+        t_mean = jnp.mean(t_obs)
+        y_mean = jnp.mean(y_obs)
+        
+        # First stage: T ~ Z
+        cov_zt = jnp.mean((z_obs - z_mean) * (t_obs - t_mean))
+        var_z = jnp.mean((z_obs - z_mean) ** 2)
+        beta_zt = cov_zt / (var_z + 1e-8)  # Avoid division by zero
+        alpha_t = t_mean - beta_zt * z_mean
+        
+        # Stage 2: Y ~ T_hat where T_hat = α + βZ
+        t_hat = alpha_t + beta_zt * z_obs
+        
+        # Reduced form: Y ~ Z
+        cov_zy = jnp.mean((z_obs - z_mean) * (y_obs - y_mean))
+        beta_zy = cov_zy / (var_z + 1e-8)
+        
+        # IV estimate: β_IV = Cov(Y,Z) / Cov(T,Z)
+        iv_estimate = beta_zy / (beta_zt + 1e-8)
+        
+        # Compute standard error and confidence interval using delta method
+        n = len(z_obs)
+        
+        # Residuals for standard error computation
+        t_residuals = t_obs - t_hat
+        y_fitted = y_mean + iv_estimate * (t_obs - t_mean)
+        y_residuals = y_obs - y_fitted
+        
+        # Standard error approximation
+        var_residual = jnp.mean(y_residuals ** 2)
+        var_first_stage = jnp.mean(t_residuals ** 2)
+        
+        iv_se = jnp.sqrt(var_residual / (n * var_first_stage * beta_zt ** 2 + 1e-8))
+        
+        # 95% confidence interval
+        ci_lower = iv_estimate - 1.96 * iv_se
+        ci_upper = iv_estimate + 1.96 * iv_se
+        
+        computation_time = time.time() - start_time
+        
+        return CausalResult(
+            intervention=Intervention(variable=f"{treatment}_iv_{instrument}", value=1),
+            outcome_distribution=y_fitted,
+            ate=float(iv_estimate),
+            confidence_interval=(float(ci_lower), float(ci_upper)),
+            computation_time=computation_time
+        )
+    
+    def compute_difference_in_differences(
+        self,
+        dag: CausalDAG,
+        treatment: str,
+        outcome: str,
+        time_var: str,
+        group_var: str,
+        n_samples: int = 10000
+    ) -> CausalResult:
+        """
+        Compute causal effect using Difference-in-Differences design.
+        
+        DiD exploits variation in treatment timing across groups to identify causal effects.
+        Estimates: E[Y_post - Y_pre | Treated] - E[Y_post - Y_pre | Control]
+        
+        Args:
+            dag: Causal DAG structure
+            treatment: Treatment variable name
+            outcome: Outcome variable name
+            time_var: Time period variable (0=pre, 1=post)
+            group_var: Group variable (0=control, 1=treatment group)
+            n_samples: Number of samples for estimation
+            
+        Returns:
+            CausalResult with DiD-estimated causal effect
+        """
+        import time
+        start_time = time.time()
+        
+        # Convert to indices
+        treatment_idx = dag.nodes.index(treatment)
+        outcome_idx = dag.nodes.index(outcome)
+        time_idx = dag.nodes.index(time_var)
+        group_idx = dag.nodes.index(group_var)
+        
+        adjacency_matrix = self._dag_to_adjacency_matrix(dag)
+        
+        # Generate panel data (pre/post for treatment/control groups)
+        self.key, subkey = random.split(self.key)
+        noise_samples = random.normal(subkey, (len(dag.nodes), n_samples))
+        
+        intervention_mask = jnp.zeros(len(dag.nodes), dtype=bool)
+        intervention_values = jnp.zeros(len(dag.nodes))
+        
+        variables = self._compute_linear_scm(
+            adjacency_matrix, noise_samples, intervention_mask, intervention_values
+        )
+        
+        # Extract variables
+        time_obs = variables[time_idx, :]
+        group_obs = variables[group_idx, :]
+        outcome_obs = variables[outcome_idx, :]
+        treatment_obs = variables[treatment_idx, :]
+        
+        # Create binary indicators
+        post_period = (time_obs > jnp.median(time_obs)).astype(float)
+        treatment_group = (group_obs > jnp.median(group_obs)).astype(float)
+        treated = treatment_group * post_period  # Interaction term
+        
+        # DiD regression: Y = α + β₁*Post + β₂*Treatment_Group + β₃*Post*Treatment_Group + ε
+        # β₃ is the DiD estimate
+        
+        # Design matrix
+        X = jnp.column_stack([
+            jnp.ones(n_samples),  # Intercept
+            post_period,  # Post period effect
+            treatment_group,  # Treatment group effect
+            treated  # DiD interaction term
+        ])
+        
+        # Ordinary Least Squares
+        XtX = jnp.dot(X.T, X)
+        XtX_inv = jnp.linalg.inv(XtX + 1e-6 * jnp.eye(4))  # Ridge regularization
+        Xty = jnp.dot(X.T, outcome_obs)
+        coefficients = jnp.dot(XtX_inv, Xty)
+        
+        # DiD estimate is the coefficient on the interaction term
+        did_estimate = coefficients[3]
+        
+        # Predicted values and residuals
+        y_pred = jnp.dot(X, coefficients)
+        residuals = outcome_obs - y_pred
+        
+        # Standard error for DiD coefficient
+        mse = jnp.mean(residuals ** 2)
+        var_coeff = mse * XtX_inv[3, 3]
+        se_did = jnp.sqrt(var_coeff)
+        
+        # 95% confidence interval
+        ci_lower = did_estimate - 1.96 * se_did
+        ci_upper = did_estimate + 1.96 * se_did
+        
+        computation_time = time.time() - start_time
+        
+        return CausalResult(
+            intervention=Intervention(variable=f"{treatment}_did", value=1),
+            outcome_distribution=y_pred,
+            ate=float(did_estimate),
+            confidence_interval=(float(ci_lower), float(ci_upper)),
+            computation_time=computation_time
+        )
+    
+    def compute_regression_discontinuity(
+        self,
+        dag: CausalDAG,
+        running_var: str,
+        treatment: str,
+        outcome: str,
+        cutoff: float,
+        bandwidth: Optional[float] = None,
+        n_samples: int = 10000
+    ) -> CausalResult:
+        """
+        Compute causal effect using Regression Discontinuity Design.
+        
+        RDD exploits arbitrary cutoff rules for treatment assignment to identify local causal effects.
+        
+        Args:
+            dag: Causal DAG structure
+            running_var: Running variable that determines treatment
+            treatment: Treatment variable name
+            outcome: Outcome variable name
+            cutoff: Cutoff value for treatment assignment
+            bandwidth: Bandwidth around cutoff (if None, optimal bandwidth is computed)
+            n_samples: Number of samples for estimation
+            
+        Returns:
+            CausalResult with RDD-estimated local causal effect
+        """
+        import time
+        start_time = time.time()
+        
+        # Convert to indices
+        running_idx = dag.nodes.index(running_var)
+        treatment_idx = dag.nodes.index(treatment)
+        outcome_idx = dag.nodes.index(outcome)
+        
+        adjacency_matrix = self._dag_to_adjacency_matrix(dag)
+        
+        # Generate data
+        self.key, subkey = random.split(self.key)
+        noise_samples = random.normal(subkey, (len(dag.nodes), n_samples))
+        
+        intervention_mask = jnp.zeros(len(dag.nodes), dtype=bool)
+        intervention_values = jnp.zeros(len(dag.nodes))
+        
+        variables = self._compute_linear_scm(
+            adjacency_matrix, noise_samples, intervention_mask, intervention_values
+        )
+        
+        # Extract variables
+        running_obs = variables[running_idx, :]
+        treatment_obs = variables[treatment_idx, :]
+        outcome_obs = variables[outcome_idx, :]
+        
+        # Center running variable around cutoff
+        running_centered = running_obs - cutoff
+        
+        # Determine optimal bandwidth if not provided
+        if bandwidth is None:
+            # Simple rule-of-thumb bandwidth
+            bandwidth = 1.5 * jnp.std(running_centered) * (n_samples ** (-1/5))
+        
+        # Keep only observations within bandwidth
+        within_bandwidth = jnp.abs(running_centered) <= bandwidth
+        
+        if jnp.sum(within_bandwidth) < 10:
+            # Too few observations, expand bandwidth
+            bandwidth *= 2
+            within_bandwidth = jnp.abs(running_centered) <= bandwidth
+        
+        # Filter data
+        running_local = running_centered[within_bandwidth]
+        treatment_local = treatment_obs[within_bandwidth]
+        outcome_local = outcome_obs[within_bandwidth]
+        
+        # Binary treatment indicator based on cutoff
+        above_cutoff = (running_local >= 0).astype(float)
+        
+        # Local linear regression on both sides of cutoff
+        # Y = α + β*Above + γ*Running + δ*Above*Running + ε
+        
+        X_local = jnp.column_stack([
+            jnp.ones(len(running_local)),  # Intercept
+            above_cutoff,  # Treatment indicator
+            running_local,  # Running variable
+            above_cutoff * running_local  # Interaction
+        ])
+        
+        # Weighted least squares with triangular kernel
+        weights = jnp.maximum(0, 1 - jnp.abs(running_local) / bandwidth)
+        W = jnp.diag(weights)
+        
+        # Weighted regression
+        XtWX = jnp.dot(X_local.T, jnp.dot(W, X_local))
+        XtWX_inv = jnp.linalg.inv(XtWX + 1e-6 * jnp.eye(4))
+        XtWy = jnp.dot(X_local.T, jnp.dot(W, outcome_local))
+        coefficients = jnp.dot(XtWX_inv, XtWy)
+        
+        # RDD estimate is the coefficient on the treatment indicator
+        rdd_estimate = coefficients[1]
+        
+        # Standard error
+        y_pred = jnp.dot(X_local, coefficients)
+        residuals = outcome_local - y_pred
+        mse = jnp.mean(weights * residuals ** 2)
+        var_coeff = mse * XtWX_inv[1, 1]
+        se_rdd = jnp.sqrt(var_coeff)
+        
+        # 95% confidence interval
+        ci_lower = rdd_estimate - 1.96 * se_rdd
+        ci_upper = rdd_estimate + 1.96 * se_rdd
+        
+        computation_time = time.time() - start_time
+        
+        return CausalResult(
+            intervention=Intervention(variable=f"{treatment}_rdd", value=1),
+            outcome_distribution=y_pred,
+            ate=float(rdd_estimate),
+            confidence_interval=(float(ci_lower), float(ci_upper)),
+            computation_time=computation_time
+        )
