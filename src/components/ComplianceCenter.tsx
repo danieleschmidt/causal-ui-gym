@@ -5,7 +5,7 @@
  * GDPR, CCPA, SOX, HIPAA, accessibility standards, and audit trails.
  */
 
-import React, { useState, useEffect, useCallback, useMemo } from 'react'
+import React, { useState, useEffect, useMemo } from 'react'
 import {
   Box,
   Grid,
@@ -34,10 +34,6 @@ import {
   InputLabel,
   Select,
   MenuItem,
-  Alert,
-  Accordion,
-  AccordionSummary,
-  AccordionDetails,
   IconButton,
   Tooltip,
   Switch,
@@ -46,7 +42,6 @@ import {
   ListItem,
   ListItemText,
   ListItemIcon,
-  Divider,
   Badge
 } from '@mui/material'
 import {
@@ -71,8 +66,8 @@ import {
   Assignment as AssignmentIcon,
   Timeline as TimelineIcon,
   VerifiedUser as VerifiedUserIcon,
-  PolicyIcon,
-  DescriptionIcon
+  Policy as PolicyIcon,
+  Description as DescriptionIcon
 } from '@mui/icons-material'
 import { useI18n } from '../hooks/useI18n'
 
@@ -206,7 +201,7 @@ export default function ComplianceCenter() {
     alternativeFormats: true
   })
 
-  const [selectedCompliance, setSelectedCompliance] = useState<string | null>(null)
+  const [, setSelectedCompliance] = useState<string | null>(null)
   const [requestDialog, setRequestDialog] = useState(false)
   const [newRequest, setNewRequest] = useState<Partial<DataSubjectRequest>>({})
   const [auditDialog, setAuditDialog] = useState(false)

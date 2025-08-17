@@ -32,6 +32,359 @@ class RateLimitError(Exception):
         super().__init__(message)
 
 
+class SecurityConfig:
+    """Advanced security configuration."""
+    def __init__(self):
+        self.rate_limit_requests = 1000  # requests per minute
+        self.rate_limit_window = 60  # seconds
+        self.max_request_size = 50 * 1024 * 1024  # 50MB
+        self.require_authentication = True
+        self.enable_ddos_protection = True
+        self.suspicious_patterns = [
+            r'union\s+select', r'drop\s+table', r'<script',
+            r'javascript:', r'\.\./', r'etc/passwd'
+        ]
+        
+
+class AdvancedSecurityMiddleware(BaseHTTPMiddleware):
+    """Enterprise-grade security middleware with threat detection."""
+    
+    def __init__(self, app, config: Optional[SecurityConfig] = None):
+        super().__init__(app)
+        self.config = config or SecurityConfig()
+        self.rate_limits = defaultdict(lambda: deque(maxlen=1000))
+        self.blocked_ips = set()
+        self.threat_scores = defaultdict(int)
+        self.security_logger = self._setup_security_logger()
+        
+    def _setup_security_logger(self) -> logging.Logger:
+        """Setup dedicated security event logger."""
+        security_logger = logging.getLogger('security_events')
+        security_logger.setLevel(logging.INFO)
+        
+        if not security_logger.handlers:
+            handler = logging.FileHandler('security_events.log')
+            formatter = logging.Formatter(
+                '%(asctime)s - SECURITY - %(levelname)s - %(message)s'
+            )
+            handler.setFormatter(formatter)
+            security_logger.addHandler(handler)
+            
+        return security_logger
+    
+    async def dispatch(self, request: Request, call_next):
+        """Process request through security filters."""
+        start_time = time.time()
+        client_ip = self._get_client_ip(request)
+        
+        # Check if IP is blocked
+        if client_ip in self.blocked_ips:
+            self.security_logger.warning(f'Blocked IP attempted access: {client_ip}')
+            return JSONResponse(
+                status_code=status.HTTP_403_FORBIDDEN,
+                content={'error': 'Access denied'}
+            )
+        
+        # Rate limiting
+        try:
+            self._check_rate_limit(client_ip)
+        except RateLimitError as e:
+            self.security_logger.warning(f'Rate limit exceeded for {client_ip}')
+            return JSONResponse(
+                status_code=status.HTTP_429_TOO_MANY_REQUESTS,
+                content={'error': e.message},
+                headers={'Retry-After': str(e.retry_after)}
+            )
+        
+        # Content security checks
+        security_violations = await self._check_request_security(request)
+        if security_violations:
+            self._handle_security_violations(client_ip, security_violations)
+            
+            # Block IP if threat score is too high
+            if self.threat_scores[client_ip] > 100:
+                self.blocked_ips.add(client_ip)
+                self.security_logger.critical(f'IP blocked due to high threat score: {client_ip}')
+        
+        # Process request
+        try:
+            response = await call_next(request)
+            
+            # Log successful request
+            duration = time.time() - start_time
+            self.security_logger.info(
+                f'Request processed: {request.method} {request.url.path} '
+                f'from {client_ip} in {duration:.3f}s'
+            )
+            
+            return response
+            
+        except Exception as e:
+            self.security_logger.error(
+                f'Request failed: {request.method} {request.url.path} '
+                f'from {client_ip} - Error: {str(e)}'
+            )
+            raise
+    
+    def _get_client_ip(self, request: Request) -> str:
+        """Extract client IP considering proxies."""
+        # Check for real IP behind proxy
+        forwarded_for = request.headers.get('x-forwarded-for')
+        if forwarded_for:
+            return forwarded_for.split(',')[0].strip()
+        
+        real_ip = request.headers.get('x-real-ip')
+        if real_ip:
+            return real_ip
+            
+        return request.client.host if request.client else 'unknown'
+    
+    def _check_rate_limit(self, client_ip: str):
+        """Enhanced rate limiting with burst protection."""
+        current_time = time.time()
+        window_start = current_time - self.config.rate_limit_window
+        
+        # Clean old requests
+        while (self.rate_limits[client_ip] and 
+               self.rate_limits[client_ip][0] < window_start):
+            self.rate_limits[client_ip].popleft()
+        
+        # Check rate limit
+        if len(self.rate_limits[client_ip]) >= self.config.rate_limit_requests:
+            # Calculate retry after
+            oldest_request = self.rate_limits[client_ip][0]
+            retry_after = int(oldest_request + self.config.rate_limit_window - current_time) + 1
+            
+            # Increase threat score for repeated violations
+            self.threat_scores[client_ip] += 10
+            
+            raise RateLimitError('Rate limit exceeded', retry_after)
+        
+        # Add current request
+        self.rate_limits[client_ip].append(current_time)
+    
+    async def _check_request_security(self, request: Request) -> List[str]:
+        """Comprehensive request security analysis."""
+        violations = []
+        
+        # Check request size
+        content_length = request.headers.get('content-length')
+        if content_length and int(content_length) > self.config.max_request_size:
+            violations.append('oversized_request')
+        
+        # Check URL for suspicious patterns
+        url_str = str(request.url)
+        for pattern in self.config.suspicious_patterns:
+            if re.search(pattern, url_str, re.IGNORECASE):
+                violations.append(f'suspicious_url_pattern:{pattern}')
+        
+        # Check headers for attacks
+        user_agent = request.headers.get('user-agent', '')
+        if self._is_suspicious_user_agent(user_agent):
+            violations.append('suspicious_user_agent')
+        
+        # Check request body if present
+        if request.method in ['POST', 'PUT', 'PATCH']:
+            try:
+                body = await request.body()
+                if body:
+                    body_str = body.decode('utf-8', errors='ignore')
+                    for pattern in self.config.suspicious_patterns:
+                        if re.search(pattern, body_str, re.IGNORECASE):
+                            violations.append(f'suspicious_body_pattern:{pattern}')
+            except Exception:
+                violations.append('malformed_request_body')
+        
+        return violations
+    
+    def _is_suspicious_user_agent(self, user_agent: str) -> bool:
+        """Check if user agent indicates bot or attack tool."""
+        suspicious_agents = [
+            'sqlmap', 'nikto', 'nmap', 'masscan', 'zap',
+            'burp', 'metasploit', 'exploit', 'scanner'
+        ]
+        
+        user_agent_lower = user_agent.lower()
+        return any(agent in user_agent_lower for agent in suspicious_agents)
+    
+    def _handle_security_violations(self, client_ip: str, violations: List[str]):
+        """Handle detected security violations."""
+        for violation in violations:
+            # Assign threat scores based on violation type
+            if 'sql' in violation.lower() or 'script' in violation.lower():
+                self.threat_scores[client_ip] += 25  # High threat
+            elif 'suspicious' in violation:
+                self.threat_scores[client_ip] += 10  # Medium threat
+            else:
+                self.threat_scores[client_ip] += 5   # Low threat
+            
+            self.security_logger.warning(
+                f'Security violation detected: {violation} from {client_ip}'
+            )
+    
+    def get_security_stats(self) -> Dict[str, Any]:
+        """Get current security statistics."""
+        current_time = time.time()
+        active_rate_limits = 0
+        
+        for ip_requests in self.rate_limits.values():
+            if ip_requests and current_time - ip_requests[-1] < 300:  # Active in last 5 minutes
+                active_rate_limits += 1
+        
+        return {
+            'blocked_ips': len(self.blocked_ips),
+            'active_rate_limited_ips': active_rate_limits,
+            'high_threat_ips': len([ip for ip, score in self.threat_scores.items() if score > 50]),
+            'total_tracked_ips': len(self.threat_scores)
+        }
+
+
+class CausalDataValidator:
+    """Specialized validator for causal inference data."""
+    
+    def __init__(self):
+        self.max_nodes = 10000
+        self.max_edges = 100000
+        self.max_intervention_value = 1e6
+        self.forbidden_node_names = {
+            'admin', 'root', 'system', 'config', 'password',
+            'secret', 'key', 'token', 'auth', 'credential'
+        }
+    
+    def validate_dag_structure(self, dag_data: Dict[str, Any]) -> Tuple[bool, List[str]]:
+        """Validate DAG for security and structural integrity."""
+        errors = []
+        
+        # Check basic structure
+        if 'nodes' not in dag_data or 'edges' not in dag_data:
+            errors.append('Invalid DAG structure: missing nodes or edges')
+            return False, errors
+        
+        nodes = dag_data['nodes']
+        edges = dag_data['edges']
+        
+        # Size limits
+        if len(nodes) > self.max_nodes:
+            errors.append(f'Too many nodes: {len(nodes)} > {self.max_nodes}')
+        
+        if len(edges) > self.max_edges:
+            errors.append(f'Too many edges: {len(edges)} > {self.max_edges}')
+        
+        # Validate node names
+        for node in nodes:
+            if isinstance(node, dict) and 'id' in node:
+                node_id = node['id'].lower()
+                if any(forbidden in node_id for forbidden in self.forbidden_node_names):
+                    errors.append(f'Forbidden node name: {node["id"]}')
+        
+        # Check for cycles (basic validation)
+        if self._has_cycles(nodes, edges):
+            errors.append('DAG contains cycles - not a valid DAG')
+        
+        return len(errors) == 0, errors
+    
+    def validate_intervention(self, intervention: Dict[str, Any]) -> Tuple[bool, List[str]]:
+        """Validate intervention parameters."""
+        errors = []
+        
+        # Check required fields
+        if 'variable' not in intervention:
+            errors.append('Missing variable field in intervention')
+        
+        if 'value' not in intervention:
+            errors.append('Missing value field in intervention')
+        
+        # Validate intervention value
+        if 'value' in intervention:
+            value = intervention['value']
+            if not isinstance(value, (int, float)):
+                errors.append(f'Invalid value type: {type(value)}')
+            elif abs(value) > self.max_intervention_value:
+                errors.append(f'Intervention value too large: {abs(value)}')
+        
+        # Validate variable name
+        if 'variable' in intervention:
+            var_name = intervention['variable'].lower()
+            if any(forbidden in var_name for forbidden in self.forbidden_node_names):
+                errors.append(f'Forbidden variable name: {intervention["variable"]}')
+        
+        return len(errors) == 0, errors
+    
+    def _has_cycles(self, nodes: List[Dict], edges: List[Dict]) -> bool:
+        """Simple cycle detection using DFS."""
+        if not nodes or not edges:
+            return False
+        
+        # Build adjacency list
+        graph = defaultdict(list)
+        node_ids = {node['id'] if isinstance(node, dict) else str(node) for node in nodes}
+        
+        for edge in edges:
+            if isinstance(edge, dict):
+                source = edge.get('source', edge.get('from'))
+                target = edge.get('target', edge.get('to'))
+                if source and target and source in node_ids and target in node_ids:
+                    graph[source].append(target)
+        
+        # DFS cycle detection
+        visited = set()
+        rec_stack = set()
+        
+        def dfs(node):
+            visited.add(node)
+            rec_stack.add(node)
+            
+            for neighbor in graph[node]:
+                if neighbor not in visited:
+                    if dfs(neighbor):
+                        return True
+                elif neighbor in rec_stack:
+                    return True
+            
+            rec_stack.remove(node)
+            return False
+        
+        for node in node_ids:
+            if node not in visited:
+                if dfs(node):
+                    return True
+        
+        return False
+
+
+# Security utilities
+def generate_api_key() -> str:
+    """Generate secure API key."""
+    return secrets.token_urlsafe(32)
+
+
+def hash_password(password: str, salt: Optional[bytes] = None) -> Tuple[str, bytes]:
+    """Hash password with salt."""
+    if salt is None:
+        salt = secrets.token_bytes(32)
+    
+    pwd_hash = hashlib.pbkdf2_hmac('sha256', password.encode(), salt, 100000)
+    return pwd_hash.hex(), salt
+
+
+def verify_password(password: str, hash_hex: str, salt: bytes) -> bool:
+    """Verify password against hash."""
+    pwd_hash = hashlib.pbkdf2_hmac('sha256', password.encode(), salt, 100000)
+    return hmac.compare_digest(pwd_hash.hex(), hash_hex)
+
+
+def secure_compare(a: str, b: str) -> bool:
+    """Timing-safe string comparison."""
+    return hmac.compare_digest(a.encode(), b.encode())
+
+
+# Global instances
+security_config = SecurityConfig()
+data_validator = CausalDataValidator()
+        self.retry_after = retry_after
+        super().__init__(message)
+
+
 class SecurityThreat(Exception):
     """Exception raised when security threat is detected."""
     def __init__(self, message: str, threat_type: str, details: Dict[str, Any]):

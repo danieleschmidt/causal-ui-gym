@@ -2,7 +2,6 @@ import React, { useState, useEffect, useMemo, useCallback, useRef } from 'react'
 import {
   Box,
   Tooltip,
-  Chip,
   Alert,
   Typography,
   ButtonGroup,
@@ -18,9 +17,6 @@ import {
   FormControlLabel,
   Slider,
   Paper,
-  Accordion,
-  AccordionSummary,
-  AccordionDetails,
   IconButton,
   Badge
 } from '@mui/material'
@@ -28,15 +24,12 @@ import {
   ZoomIn as ZoomInIcon,
   ZoomOut as ZoomOutIcon,
   CenterFocusStrong as CenterIcon,
-  PlayArrow as PlayIcon,
-  Pause as PauseIcon,
-  ExpandMore as ExpandMoreIcon,
   Settings as SettingsIcon,
   Timeline as TimelineIcon,
   Visibility as VisibilityIcon,
   VisibilityOff as VisibilityOffIcon
 } from '@mui/icons-material'
-import { CausalDAG, CausalNode, CausalEdge } from '../types'
+import { CausalDAG, CausalNode } from '../types'
 import { validateDAG } from '../utils'
 import { useErrorHandler } from './ErrorBoundary'
 
@@ -97,8 +90,6 @@ export function CausalGraph({
   onMetricsUpdate
 }: CausalGraphProps) {
   const { handleError } = useErrorHandler()
-  const svgRef = useRef<SVGSVGElement>(null)
-  const animationFrameRef = useRef<number>()
   const [graphState, setGraphState] = useState<GraphState>({
     scale: 1,
     panX: 0,
@@ -118,7 +109,7 @@ export function CausalGraph({
   const [validationResult, setValidationResult] = useState<any>(null)
   const [causalFlowSteps, setCausalFlowSteps] = useState<CausalFlowStep[]>([])
   const [activeAnimation, setActiveAnimation] = useState<boolean>(false)
-  const [backdoorPaths, setBackdoorPaths] = useState<string[][]>([])
+  const [backdoorPaths] = useState<string[][]>([])
   const [settingsOpen, setSettingsOpen] = useState<boolean>(false)
   const [realtimeMetrics, setRealtimeMetrics] = useState<any>({})
 
@@ -550,7 +541,7 @@ export function CausalGraph({
                 style={{ cursor: interactive ? 'pointer' : 'default' }}
                 onMouseEnter={() => interactive && setHoveredNode(node.id)}
                 onMouseLeave={() => setHoveredNode(null)}
-                onClick={(e) => handleNodeClick(node.id, e.nativeEvent)}
+                onClick={(e) => handleNodeClick(node.id, e as unknown as React.MouseEvent)}
               >
                 {hasActiveFlow && (
                   <animate
@@ -621,7 +612,7 @@ export function CausalGraph({
                     fontWeight="bold"
                     className="pointer-events-none select-none"
                   >
-                    do({node.interventionValue})
+                    do({(node as any).interventionValue})
                   </text>
                 </g>
               )}
@@ -692,8 +683,6 @@ export function CausalGraph({
         </MenuItem>
         <MenuItem onClick={() => {
           if (contextMenu) {
-            // Find backdoor paths for this node
-            const targetNodes = dag.nodes.filter(n => n.id !== contextMenu.nodeId)
             // This would integrate with causal engine for proper backdoor identification
             console.log(`Finding backdoor paths for ${contextMenu.nodeId}`)
           }

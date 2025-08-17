@@ -10,7 +10,7 @@ python-multipart>=0.0.9
 
 # Causal inference libraries
 pgmpy>=0.1.25
-causalnex>=0.12.0
+# causalnex>=0.12.0  # Skipped: incompatible with Python 3.12
 dowhy>=0.11.0
 
 # LLM integrations

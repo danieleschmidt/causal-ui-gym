@@ -8,18 +8,15 @@ import {
   CardContent, 
   Typography, 
   Collapse,
-  IconButton,
-  CircularProgress,
-  Chip
+  CircularProgress
 } from '@mui/material'
 import { 
   Error as ErrorIcon, 
   ExpandMore as ExpandMoreIcon,
   Refresh as RefreshIcon,
   BugReport as BugReportIcon,
-  Warning as WarningIcon,
   Info as InfoIcon,
-  Emergency as EmergencyIcon
+  Warning as EmergencyIcon
 } from '@mui/icons-material'
 import { metrics } from '../utils/metrics'
 
@@ -125,7 +122,7 @@ export class ErrorBoundary extends Component<Props, State> {
           severity: errorSeverity,
           retryCount: this.state.retryCount,
           userContext: this.state.userContext,
-          componentStack: errorInfo.componentStack,
+          componentStack: errorInfo?.componentStack || 'No component stack',
           props: this.sanitizeProps()
         }
       )
@@ -193,21 +190,21 @@ export class ErrorBoundary extends Component<Props, State> {
     // Critical errors that completely break the application
     if (error.message.includes('ChunkLoadError') || 
         error.message.includes('Script error') ||
-        errorInfo.componentStack.includes('App')) {
+        errorInfo?.componentStack?.includes('App')) {
       return 'critical'
     }
     
     // High severity for core functionality
     if (error.message.includes('causal') || 
         error.message.includes('experiment') ||
-        errorInfo.componentStack.includes('CausalGraph') ||
-        errorInfo.componentStack.includes('ExperimentBuilder')) {
+        errorInfo?.componentStack?.includes('CausalGraph') ||
+        errorInfo?.componentStack?.includes('ExperimentBuilder')) {
       return 'high'
     }
     
     // Medium for UI components
-    if (errorInfo.componentStack.includes('Dashboard') || 
-        errorInfo.componentStack.includes('Metrics')) {
+    if (errorInfo?.componentStack?.includes('Dashboard') || 
+        errorInfo?.componentStack?.includes('Metrics')) {
       return 'medium'
     }
     
