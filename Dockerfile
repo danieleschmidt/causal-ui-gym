@@ -32,7 +32,7 @@ ENV VITE_BUILD_SOURCEMAP=false
 RUN npm run build && npm run build:analyze
 
 # Stage 2: Python Backend Build
-FROM python:3.13-slim AS backend-builder
+FROM python:3.13.7-slim AS backend-builder
 
 # Set build environment variables
 ENV PYTHONDONTWRITEBYTECODE=1 \
@@ -66,7 +66,7 @@ RUN pip install --upgrade pip setuptools wheel && \
 COPY backend/ ./backend/
 
 # Stage 3: Production Runtime
-FROM python:3.13-slim AS production
+FROM python:3.13.7-slim AS production
 
 # Metadata labels for container scanning
 LABEL maintainer="Terragon Labs <security@terragonlabs.com>" \
