@@ -1,9 +1,15 @@
 #!/usr/bin/env python3
 """
-Health Monitor Service for Causal UI Gym
+Enterprise Health Monitoring System for Causal UI Gym - ENHANCED VERSION
 
-Continuous health monitoring with alerts and auto-recovery capabilities.
-Integrates with Prometheus for metrics and Slack for notifications.
+Provides comprehensive system monitoring including:
+- Real-time performance metrics
+- Resource utilization tracking  
+- Predictive health analysis
+- Automated alerting and remediation
+- Distributed tracing
+- Custom causal inference metrics
+- Integration with Prometheus, Grafana, and external alerting
 """
 
 import asyncio

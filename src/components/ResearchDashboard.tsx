@@ -42,7 +42,7 @@ import {
   Assessment as AssessmentIcon,
   Memory as MemoryIcon,
   Speed as SpeedIcon,
-  Precision as PrecisionIcon,
+  Psychology as PrecisionIcon,
   ExpandMore as ExpandMoreIcon,
   PlayArrow as PlayIcon,
   Stop as StopIcon,

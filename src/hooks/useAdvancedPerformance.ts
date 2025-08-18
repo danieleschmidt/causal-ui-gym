@@ -603,4 +603,95 @@ export function useAdvancedPerformance(config: Partial<AdvancedPerformanceConfig
             if (onProgress) {
               onProgress(index / array.length)
             }
-          } catch (error) {\n            reject(error)\n            return\n          }\n        }\n        \n        if (index < array.length) {\n          scheduler.current.addTask({\n            id: `adaptive_process_${Date.now()}`,\n            fn: processNext,\n            priority: 5,\n            estimatedTime: targetFrameTime,\n            dependencies: [],\n            timeout: 30000,\n            metadata: { progress: index / array.length }\n          })\n        } else {\n          resolve(results)\n        }\n      }\n      \n      processNext()\n    })\n  }, [defaultConfig.chunkSize])\n  \n  // Predictive resource management\n  const optimizeResources = useCallback(() => {\n    const currentMetrics = metrics\n    const recommendations: string[] = []\n    \n    // Memory optimization\n    if (currentMetrics.memoryUsage > defaultConfig.memoryThreshold) {\n      cache.current.clear()\n      recommendations.push('Cleared cache due to high memory usage')\n    }\n    \n    // Frame rate optimization\n    if (currentMetrics.frameRate < 50) {\n      // Reduce visual complexity, enable aggressive caching\n      recommendations.push('Enabled performance mode due to low frame rate')\n    }\n    \n    // Worker efficiency optimization\n    if (currentMetrics.workerEfficiency < 0.7 && workerPool.current.length > 2) {\n      // Reduce worker pool size\n      const excessWorkers = workerPool.current.splice(2)\n      excessWorkers.forEach(worker => worker.terminate())\n      recommendations.push('Reduced worker pool size due to low efficiency')\n    }\n    \n    return recommendations\n  }, [metrics, defaultConfig.memoryThreshold])\n  \n  // Performance report generation\n  const generateReport = useCallback(() => {\n    const cacheStats = cache.current.getStats()\n    \n    return {\n      timestamp: new Date().toISOString(),\n      metrics,\n      cache: cacheStats,\n      system: {\n        userAgent: navigator.userAgent,\n        hardwareConcurrency: navigator.hardwareConcurrency,\n        deviceMemory: (navigator as any).deviceMemory || 'unknown',\n        connection: (navigator as any).connection || 'unknown'\n      },\n      recommendations: optimizeResources()\n    }\n  }, [metrics, optimizeResources])\n  \n  // Cleanup\n  useEffect(() => {\n    return () => {\n      workerPool.current.forEach(worker => worker.terminate())\n      performanceObserver.current?.disconnect()\n    }\n  }, [])\n  \n  return {\n    metrics,\n    cache: cache.current,\n    scheduler: scheduler.current,\n    intelligentMemoize,\n    accelerateWithGPU,\n    initializeWorkerPool,\n    processAdaptively,\n    optimizeResources,\n    generateReport,\n    clearCache: () => cache.current.clear()\n  }\n}
+          } catch (error) {
+            reject(error)
+            return
+          }
+        }
+        
+        if (index < array.length) {
+          scheduler.current.addTask({
+            id: `adaptive_process_${Date.now()}`,
+            fn: processNext,
+            priority: 5,
+            estimatedTime: targetFrameTime,
+            dependencies: [],
+            timeout: 30000,
+            metadata: { progress: index / array.length }
+          })
+        } else {
+          resolve(results)
+        }
+      }
+      
+      processNext()
+    })
+  }, [defaultConfig.chunkSize])
+  
+  // Predictive resource management
+  const optimizeResources = useCallback(() => {
+    const currentMetrics = metrics
+    const recommendations: string[] = []
+    
+    // Memory optimization
+    if (currentMetrics.memoryUsage > defaultConfig.memoryThreshold) {
+      cache.current.clear()
+      recommendations.push('Cleared cache due to high memory usage')
+    }
+    
+    // Frame rate optimization
+    if (currentMetrics.frameRate < 50) {
+      // Reduce visual complexity, enable aggressive caching
+      recommendations.push('Enabled performance mode due to low frame rate')
+    }
+    
+    // Worker efficiency optimization
+    if (currentMetrics.workerEfficiency < 0.7 && workerPool.current.length > 2) {
+      // Reduce worker pool size
+      const excessWorkers = workerPool.current.splice(2)
+      excessWorkers.forEach(worker => worker.terminate())
+      recommendations.push('Reduced worker pool size due to low efficiency')
+    }
+    
+    return recommendations
+  }, [metrics, defaultConfig.memoryThreshold])
+  
+  // Performance report generation
+  const generateReport = useCallback(() => {
+    const cacheStats = cache.current.getStats()
+    
+    return {
+      timestamp: new Date().toISOString(),
+      metrics,
+      cache: cacheStats,
+      system: {
+        userAgent: navigator.userAgent,
+        hardwareConcurrency: navigator.hardwareConcurrency,
+        deviceMemory: (navigator as any).deviceMemory || 'unknown',
+        connection: (navigator as any).connection || 'unknown'
+      },
+      recommendations: optimizeResources()
+    }
+  }, [metrics, optimizeResources])
+  
+  // Cleanup
+  useEffect(() => {
+    return () => {
+      workerPool.current.forEach(worker => worker.terminate())
+      performanceObserver.current?.disconnect()
+    }
+  }, [])
+  
+  return {
+    metrics,
+    cache: cache.current,
+    scheduler: scheduler.current,
+    intelligentMemoize,
+    accelerateWithGPU,
+    initializeWorkerPool,
+    processAdaptively,
+    optimizeResources,
+    generateReport,
+    clearCache: () => cache.current.clear()
+  }
+}
