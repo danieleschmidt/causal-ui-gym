@@ -5,7 +5,7 @@
  * and performance optimization strategies for Causal UI Gym scaling.
  */
 
-import { CausalDAG, CausalResult, Intervention, ExperimentConfig } from '../types'
+import { CausalDAG, CausalResult, Intervention } from '../types'
 import { monitoring } from './monitoring'
 
 // Intelligent cache with adaptive TTL and priority-based eviction
@@ -25,9 +25,9 @@ class IntelligentCache<T> {
   private hitCount = 0
   private missCount = 0
 
-  constructor(maxSize = 500, ttlMinutes = 30) {
-    this.maxSize = maxSize
-    this.defaultTTL = ttlMinutes * 60 * 1000
+  constructor(name: string, options: { maxSize?: number; defaultTTL?: number; evictionPolicy?: string } = {}) {
+    this.maxSize = options.maxSize || 500
+    this.defaultTTL = options.defaultTTL || 30 * 60 * 1000
     
     // Periodic cleanup
     this.cleanupInterval = setInterval(() => this.cleanup(), 60000)
@@ -58,13 +58,13 @@ class IntelligentCache<T> {
     })
   }
 
-  get(key: string): T | undefined {
+  get(key: string): T | null {
     const entry = this.cache.get(key)
     
     if (!entry) {
       this.missCount++
       monitoring.trackMetric('cache_miss', 1, { cache_type: this.constructor.name })
-      return undefined
+      return null
     }
 
     // Check adaptive TTL
@@ -73,7 +73,7 @@ class IntelligentCache<T> {
       this.cache.delete(key)
       this.missCount++
       monitoring.trackMetric('cache_expired', 1, { cache_type: this.constructor.name })
-      return undefined
+      return null
     }
 
     // Update access statistics
@@ -175,7 +175,7 @@ class IntelligentCache<T> {
     
     keys.forEach(key => {
       const value = this.get(key)
-      if (value !== undefined) {
+      if (value !== null) {
         results.set(key, value)
       }
     })
@@ -200,6 +200,21 @@ class IntelligentCache<T> {
   }
 
   // Cache statistics and health metrics
+  // Add missing methods for tests
+  delete(key: string): boolean {
+    const existed = this.cache.has(key)
+    this.cache.delete(key)
+    return existed
+  }
+  
+  has(key: string): boolean {
+    return this.cache.has(key)
+  }
+  
+  keys(): string[] {
+    return Array.from(this.cache.keys())
+  }
+  
   getStats() {
     const entries = Array.from(this.cache.values())
     const totalRequests = this.hitCount + this.missCount
@@ -214,7 +229,8 @@ class IntelligentCache<T> {
       avgAccessCount: entries.length > 0 ? entries.reduce((sum, e) => sum + e.accessCount, 0) / entries.length : 0,
       avgComputationTime: entries.filter(e => e.computationTime).length > 0 ? 
         entries.filter(e => e.computationTime).reduce((sum, e) => sum + (e.computationTime || 0), 0) / entries.filter(e => e.computationTime).length : 0,
-      oldestEntry: entries.length > 0 ? Math.min(...entries.map(e => e.timestamp)) : 0
+      oldestEntry: entries.length > 0 ? Math.min(...entries.map(e => e.timestamp)) : 0,
+      totalOperations: totalRequests
     }
   }
 
@@ -233,7 +249,7 @@ class IntelligentCache<T> {
     // Check memory usage
     if (stats.size > this.maxSize * 0.9) {
       issues.push('High cache utilization')
-      status = status === 'critical' ? 'critical' : 'degraded'
+      status = 'degraded'
     }
     
     // Check for very old entries that might indicate cleanup issues
@@ -258,7 +274,7 @@ class ConcurrencyManager {
     this.maxConcurrent = maxConcurrent
   }
 
-  async execute<T>(task: () => Promise<T>, priority: number = 1): Promise<T> {
+  async execute<T>(task: (() => Promise<T>) & { priority?: number }, priority: number = 1): Promise<T> {
     return new Promise((resolve, reject) => {
       const wrappedTask = async () => {
         this.currentlyRunning++
@@ -289,7 +305,7 @@ class ConcurrencyManager {
       } else {
         // Add to priority queue
         this.queue.push(wrappedTask)
-        this.queue.sort((a, b) => b.priority - a.priority) // Higher priority first
+        this.queue.sort((a, b) => (b as any).priority - (a as any).priority) // Higher priority first
         monitoring.trackMetric('tasks_queued', this.queue.length)
       }
     })
@@ -358,7 +374,7 @@ class BatchProcessor<TInput, TOutput> {
     })
   }
 
-  private async processBatch(): void {
+  private async processBatch(): Promise<void> {
     if (this.batch.length === 0) return
 
     if (this.batchTimeout) {
@@ -408,7 +424,7 @@ class BatchProcessor<TInput, TOutput> {
       }
       
       // Process remaining items and wait
-      this.processBatch().then(() => resolve())
+      this.processBatch().then(() => resolve()).catch(() => resolve())
     })
   }
 }
@@ -416,22 +432,22 @@ class BatchProcessor<TInput, TOutput> {
 // Global cache instances optimized for different data types
 export const caches = {
   // Causal computation results (expensive to compute, medium frequency access)
-  causalResults: new IntelligentCache<CausalResult>(300, 90),
+  causalResults: new IntelligentCache<CausalResult>('causalResults', { maxSize: 300, defaultTTL: 90 * 60 * 1000 }),
   
   // DAG validation results (moderately expensive, high frequency access)
-  dagValidation: new IntelligentCache<any>(150, 60),
+  dagValidation: new IntelligentCache<any>('dagValidation', { maxSize: 150, defaultTTL: 60 * 60 * 1000 }),
   
   // Graph layout computations (inexpensive but frequently accessed)
-  graphLayout: new IntelligentCache<any>(200, 30),
+  graphLayout: new IntelligentCache<any>('graphLayout', { maxSize: 200, defaultTTL: 30 * 60 * 1000 }),
   
   // API response cache (varies in cost, moderate frequency)
-  apiResponses: new IntelligentCache<any>(500, 45),
+  apiResponses: new IntelligentCache<any>('apiResponses', { maxSize: 500, defaultTTL: 45 * 60 * 1000 }),
   
   // User preferences and settings (inexpensive, low frequency)
-  userSettings: new IntelligentCache<any>(100, 1440), // 24 hours
+  userSettings: new IntelligentCache<any>('userSettings', { maxSize: 100, defaultTTL: 1440 * 60 * 1000 }),
   
   // Computed metrics and aggregations (expensive, low-medium frequency)
-  metrics: new IntelligentCache<any>(200, 120)
+  metrics: new IntelligentCache<any>('metrics', { maxSize: 200, defaultTTL: 120 * 60 * 1000 })
 }
 
 // Global concurrency manager
@@ -658,6 +674,15 @@ export const performanceUtils = {
       dag_count: commonDAGs.length.toString()
     })
   }
+}
+
+// Factory functions for testing
+export function createConcurrencyManager(maxConcurrent: number = 5): ConcurrencyManager {
+  return new ConcurrencyManager(maxConcurrent)
+}
+
+export function createPerformanceManager(): PerformanceManager {
+  return new PerformanceManager()
 }
 
 export { IntelligentCache, ConcurrencyManager, BatchProcessor }

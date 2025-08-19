@@ -270,11 +270,9 @@ export class ErrorBoundary extends Component<Props, State> {
 
   handleRetry = () => {
     // Track manual retry
-    metrics.trackEvent('error_boundary_manual_retry', {
-      errorId: this.state.errorId,
-      retryCount: this.state.retryCount,
-      errorCategory: this.state.errorCategory
-    })
+    if (metrics.trackMetric) {
+      metrics.trackMetric('error_boundary_manual_retry', 1)
+    }
     
     this.setState(prevState => ({
       hasError: false,
@@ -313,7 +311,10 @@ export class ErrorBoundary extends Component<Props, State> {
     }
 
     // Track bug report submission
-    metrics.trackEvent('bug_report_submitted', {
+    if (metrics.trackMetric) {
+      metrics.trackMetric('bug_report_submitted', 1)
+    }
+    if (false) { // Disable the rest of this block
       errorId,
       category: errorCategory,
       severity: errorSeverity

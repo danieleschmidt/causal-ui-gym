@@ -95,7 +95,7 @@ describe('Validation Utils', () => {
         value: 1.5,
         intervention_type: 'do',
         description: 'Test intervention',
-        timestamp: Date.now()
+        timestamp: new Date(Date.now())
       }
 
       const result = validateIntervention(intervention)
@@ -109,7 +109,7 @@ describe('Validation Utils', () => {
         value: 1.5,
         intervention_type: 'do',
         description: 'Test intervention',
-        timestamp: Date.now()
+        timestamp: new Date(Date.now())
       }
 
       const result = validateIntervention(intervention)
@@ -123,7 +123,7 @@ describe('Validation Utils', () => {
         value: null as any,
         intervention_type: 'do',
         description: 'Test intervention',
-        timestamp: Date.now()
+        timestamp: new Date(Date.now())
       }
 
       const result = validateIntervention(intervention)
@@ -146,7 +146,7 @@ describe('Validation Utils', () => {
         value: 1.5,
         intervention_type: 'do',
         description: 'Test intervention',
-        timestamp: Date.now()
+        timestamp: new Date(Date.now())
       }
 
       const result = validateIntervention(intervention, dag)
