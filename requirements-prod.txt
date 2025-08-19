@@ -109,7 +109,7 @@ dnspython==2.4.2
 certifi==2023.11.17
 
 # Production WSGI/ASGI
-gevent==23.9.1
+gevent==25.5.1
 
 # Memory Profiling
 memory-profiler==0.61.0
