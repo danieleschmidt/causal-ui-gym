@@ -2,7 +2,8 @@ import { describe, it, expect, beforeEach, vi } from 'vitest'
 import { IntelligentCache, createConcurrencyManager, createPerformanceManager } from './cache'
 
 // Mock performance.now for consistent testing
-global.performance = global.performance || { now: vi.fn() }
+const mockPerformanceNow = vi.fn()
+global.performance = global.performance || { now: mockPerformanceNow }
 
 describe('Cache Utils', () => {
   let cache: IntelligentCache<string>
@@ -15,7 +16,7 @@ describe('Cache Utils', () => {
     })
     vi.clearAllMocks()
     // Mock performance.now to return predictable values
-    vi.mocked(performance.now).mockReturnValue(0)
+    mockPerformanceNow.mockReturnValue(0)
   })
 
   describe('IntelligentCache', () => {
@@ -29,11 +30,11 @@ describe('Cache Utils', () => {
     })
 
     it('should respect TTL expiration', () => {
-      vi.mocked(performance.now).mockReturnValue(0)
+      mockPerformanceNow.mockReturnValue(0)
       cache.set('key1', 'value1')
       
       // Move time forward beyond TTL
-      vi.mocked(performance.now).mockReturnValue(1500)
+      mockPerformanceNow.mockReturnValue(1500)
       expect(cache.get('key1')).toBeNull()
     })
 

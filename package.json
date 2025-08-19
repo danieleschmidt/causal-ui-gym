@@ -31,6 +31,7 @@
   },
   "devDependencies": {
     "@mui/icons-material": "^5.18.0",
+    "@pact-foundation/pact": "^15.0.1",
     "@storybook/react": "^8.1.0",
     "@storybook/react-vite": "^8.1.0",
     "@testing-library/jest-dom": "^6.7.0",
