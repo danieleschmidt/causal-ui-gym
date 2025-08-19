@@ -100,7 +100,7 @@ pillow==11.3.0
 pypdf2==3.0.1
 
 # Excel Processing (optional)
-openpyxl==3.1.2
+openpyxl==3.1.5
 
 # Network Security
 dnspython==2.4.2
