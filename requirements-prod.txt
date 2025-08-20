@@ -59,7 +59,7 @@ python-dateutil==2.9.0.post0
 pytz==2023.3
 
 # Validation
-email-validator==2.1.0.post1
+email-validator==2.2.0
 phonenumbers==9.0.11
 
 # Async Support
