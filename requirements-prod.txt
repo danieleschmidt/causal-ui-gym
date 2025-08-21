@@ -121,7 +121,7 @@ py-spy==0.3.14
 healthcheck==1.3.3
 
 # Backup Utilities
-boto3==1.34.0  # AWS S3 for backups
+boto3==1.40.14  # AWS S3 for backups
 google-cloud-storage==3.3.0  # Google Cloud Storage
 
 # Error Tracking
