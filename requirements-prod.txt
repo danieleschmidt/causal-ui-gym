@@ -16,7 +16,7 @@ alembic==1.13.1
 sqlalchemy==2.0.42
 
 # Caching
-redis==5.0.1
+redis==6.4.0
 hiredis==2.2.3
 
 # Scientific Computing
