@@ -32,7 +32,7 @@ httpx==0.28.1
 aiohttp==3.12.15
 
 # Security
-cryptography==41.0.8
+cryptography==45.0.6
 python-jose[cryptography]==3.5.0
 passlib[bcrypt]==1.7.4
 python-multipart==0.0.6
