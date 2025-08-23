@@ -1,0 +1,159 @@
+version: '3.8'
+
+services:
+  # Frontend Service
+  frontend:
+    build:
+      context: .
+      dockerfile: Dockerfile.frontend
+    ports:
+      - "3000:3000"
+    environment:
+      - NODE_ENV=production
+      - VITE_API_URL=http://backend:8002
+    depends_on:
+      - backend
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:3000/"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    labels:
+      - "causal-ui-gym.service=frontend"
+      - "causal-ui-gym.tier=presentation"
+
+  # Scalable Backend Service
+  backend:
+    build:
+      context: .
+      dockerfile: Dockerfile.backend
+    ports:
+      - "8002:8002"
+    environment:
+      - PYTHONUNBUFFERED=1
+      - PORT=8002
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "python3", "-c", "import requests; requests.get('http://localhost:8002/health', timeout=5)"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+      start_period: 40s
+    volumes:
+      - backend-data:/app/data
+    labels:
+      - "causal-ui-gym.service=backend"
+      - "causal-ui-gym.tier=application"
+
+  # Load Balancer (HAProxy)
+  loadbalancer:
+    image: haproxy:2.8
+    ports:
+      - "80:80"
+      - "8404:8404"  # HAProxy stats
+    volumes:
+      - ./deployment/haproxy.cfg:/usr/local/etc/haproxy/haproxy.cfg:ro
+    depends_on:
+      - frontend
+      - backend
+    restart: unless-stopped
+    labels:
+      - "causal-ui-gym.service=loadbalancer"
+      - "causal-ui-gym.tier=infrastructure"
+
+  # Monitoring Stack
+  prometheus:
+    image: prom/prometheus:v2.47.0
+    ports:
+      - "9090:9090"
+    volumes:
+      - ./monitoring/prometheus.yml:/etc/prometheus/prometheus.yml:ro
+      - prometheus-data:/prometheus
+    command:
+      - '--config.file=/etc/prometheus/prometheus.yml'
+      - '--storage.tsdb.path=/prometheus'
+      - '--web.console.libraries=/etc/prometheus/console_libraries'
+      - '--web.console.templates=/etc/prometheus/consoles'
+      - '--storage.tsdb.retention.time=200h'
+      - '--web.enable-lifecycle'
+    restart: unless-stopped
+    labels:
+      - "causal-ui-gym.service=prometheus"
+      - "causal-ui-gym.tier=monitoring"
+
+  grafana:
+    image: grafana/grafana:10.1.0
+    ports:
+      - "3001:3000"
+    environment:
+      - GF_SECURITY_ADMIN_PASSWORD=causal-ui-admin
+    volumes:
+      - grafana-data:/var/lib/grafana
+      - ./monitoring/grafana/provisioning:/etc/grafana/provisioning
+    depends_on:
+      - prometheus
+    restart: unless-stopped
+    labels:
+      - "causal-ui-gym.service=grafana"
+      - "causal-ui-gym.tier=monitoring"
+
+  # Redis for Caching and Session Storage
+  redis:
+    image: redis:7.2-alpine
+    ports:
+      - "6379:6379"
+    command: redis-server --appendonly yes --requirepass causal-redis-pass
+    volumes:
+      - redis-data:/data
+    restart: unless-stopped
+    healthcheck:
+      test: ["CMD", "redis-cli", "--no-auth-warning", "-a", "causal-redis-pass", "ping"]
+      interval: 30s
+      timeout: 10s
+      retries: 3
+    labels:
+      - "causal-ui-gym.service=redis"
+      - "causal-ui-gym.tier=cache"
+
+  # Nginx Reverse Proxy
+  nginx:
+    image: nginx:1.25-alpine
+    ports:
+      - "443:443"
+    volumes:
+      - ./deployment/nginx.conf:/etc/nginx/nginx.conf:ro
+      - ./deployment/ssl:/etc/nginx/ssl:ro
+    depends_on:
+      - loadbalancer
+    restart: unless-stopped
+    labels:
+      - "causal-ui-gym.service=nginx"
+      - "causal-ui-gym.tier=proxy"
+
+volumes:
+  backend-data:
+    driver: local
+    labels:
+      - "causal-ui-gym.volume=backend-data"
+  
+  prometheus-data:
+    driver: local
+    labels:
+      - "causal-ui-gym.volume=prometheus-data"
+  
+  grafana-data:
+    driver: local
+    labels:
+      - "causal-ui-gym.volume=grafana-data"
+  
+  redis-data:
+    driver: local
+    labels:
+      - "causal-ui-gym.volume=redis-data"
+
+networks:
+  default:
+    name: causal-ui-gym-network
+    labels:
+      - "causal-ui-gym.network=main"

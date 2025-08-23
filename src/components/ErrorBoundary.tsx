@@ -314,11 +314,7 @@ export class ErrorBoundary extends Component<Props, State> {
     if (metrics.trackMetric) {
       metrics.trackMetric('bug_report_submitted', 1)
     }
-    if (false) { // Disable the rest of this block
-      errorId,
-      category: errorCategory,
-      severity: errorSeverity
-    })
+    // Enhanced bug report already defined above
     
     console.log('Enhanced bug report generated:', enhancedBugReport)
     
