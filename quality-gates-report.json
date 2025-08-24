@@ -9,10 +9,12 @@
     "recommendations": []
   },
   "performance": {
-    "status": "pass",
-    "score": 80,
+    "status": "warning",
+    "score": 70,
     "issues": [
-      "Large estimated bundle size: 292.4MB",
+      "Large estimated bundle size: 311.2MB",
+      "Unoptimized API calls in useEffect in src/components/RobustDemo.tsx",
+      "Unoptimized API calls in useEffect in src/components/AdvancedPerformanceDashboard.tsx",
       "Unoptimized API calls in useEffect in src/hooks/usePerformanceOptimization.ts",
       "Inefficient DOM queries in src/utils/accessibility.ts",
       "Very short setTimeout (< 10ms) in src/utils/cache.test.ts"
@@ -22,9 +24,9 @@
       "concurrency_score": 100
     },
     "bundle_info": {
-      "size_mb": 292.41061782836914,
-      "file_count": 54844,
-      "estimated_gzipped_mb": 87.72318534851074
+      "size_mb": 311.22550201416016,
+      "file_count": 54862,
+      "estimated_gzipped_mb": 93.36765060424804
     },
     "recommendations": [
       "Review timer usage and consider requestAnimationFrame for UI updates"
@@ -34,6 +36,9 @@
     "status": "fail",
     "score": 0,
     "issues": [
+      "Function with too many parameters in src/components/AdvancedCausalAnalyzer.tsx",
+      "Complex conditional statements in src/components/AdvancedCausalAnalyzer.tsx",
+      "Use of loose equality in src/components/AdvancedCausalAnalyzer.tsx",
       "Function with too many parameters in src/components/CausalGraph.tsx",
       "Complex conditional statements in src/components/CausalGraph.tsx",
       "Use of loose equality in src/components/CausalGraph.tsx",
@@ -52,17 +57,21 @@
       "Non-deterministic date creation in src/components/InterventionControl.tsx",
       "Function with too many parameters in src/components/MetricsDashboard.tsx",
       "Use of loose equality in src/components/MetricsDashboard.tsx",
-      "Function with too many parameters in src/components/ResearchDashboard.tsx",
-      "Complex conditional statements in src/components/ResearchDashboard.tsx",
-      "Use of loose equality in src/components/ResearchDashboard.tsx",
-      "Non-deterministic date creation in src/components/ResearchDashboard.tsx",
       "Function with too many parameters in src/components/ProductionExperimentRunner.tsx",
       "Complex conditional statements in src/components/ProductionExperimentRunner.tsx",
       "Use of loose equality in src/components/ProductionExperimentRunner.tsx",
       "Non-deterministic date creation in src/components/ProductionExperimentRunner.tsx",
-      "Function with too many parameters in src/components/AdvancedCausalAnalyzer.tsx",
-      "Complex conditional statements in src/components/AdvancedCausalAnalyzer.tsx",
-      "Use of loose equality in src/components/AdvancedCausalAnalyzer.tsx",
+      "Function with too many parameters in src/components/ResearchDashboard.tsx",
+      "Complex conditional statements in src/components/ResearchDashboard.tsx",
+      "Use of loose equality in src/components/ResearchDashboard.tsx",
+      "Non-deterministic date creation in src/components/ResearchDashboard.tsx",
+      "Use of loose equality in src/components/RobustDemo.tsx",
+      "Complex conditional statements in src/components/ScalableDemo.tsx",
+      "Use of loose equality in src/components/ScalableDemo.tsx",
+      "Function with too many parameters in src/components/SimpleWorkingDemo.tsx",
+      "Complex conditional statements in src/components/AdvancedPerformanceDashboard.tsx",
+      "Use of loose equality in src/components/AdvancedPerformanceDashboard.tsx",
+      "Non-deterministic date creation in src/components/AdvancedPerformanceDashboard.tsx",
       "Complex conditional statements in src/hooks/useAdvancedPerformance.ts",
       "Use of loose equality in src/hooks/useAdvancedPerformance.ts",
       "Non-deterministic date creation in src/hooks/useAdvancedPerformance.ts",
@@ -85,6 +94,9 @@
       "Complex conditional statements in src/utils/monitoring.ts",
       "Use of loose equality in src/utils/monitoring.ts",
       "Non-deterministic date creation in src/utils/monitoring.ts",
+      "Complex conditional statements in src/utils/performance-optimizer.ts",
+      "Use of loose equality in src/utils/performance-optimizer.ts",
+      "Non-deterministic date creation in src/utils/performance-optimizer.ts",
       "Function with too many parameters in src/utils/security.ts",
       "Complex conditional statements in src/utils/security.ts",
       "Use of loose equality in src/utils/security.ts",
@@ -92,11 +104,10 @@
       "Function with too many parameters in src/utils/validation.ts",
       "Complex conditional statements in src/utils/validation.ts",
       "Use of loose equality in src/utils/validation.ts",
-      "Complex conditional statements in src/utils/performance-optimizer.ts",
-      "Use of loose equality in src/utils/performance-optimizer.ts",
-      "Non-deterministic date creation in src/utils/performance-optimizer.ts",
       "Use of var instead of let/const in backend/initialization.py",
       "Use of loose equality in backend/initialization.py",
+      "Use of loose equality in backend/scalable_server.py",
+      "Use of loose equality in backend/simple_server.py",
       "Use of loose equality in backend/warmup.py",
       "Use of loose equality in backend/api/websocket_manager.py",
       "Complex conditional statements in backend/benchmarking/causal_benchmarks.py",
@@ -106,23 +117,28 @@
       "Use of var instead of let/const in backend/engine/causal_engine.py",
       "Use of loose equality in backend/engine/causal_engine.py",
       "Use of loose equality in backend/error_handling/causal_exceptions.py",
+      "Use of loose equality in backend/error_handling/advanced_error_system.py",
       "Use of var instead of let/const in backend/llm/research_agents.py",
       "Use of loose equality in backend/middleware/security.py",
       "Use of loose equality in backend/models/causal_models.py",
       "Use of loose equality in backend/monitoring/health_monitor.py",
       "Complex conditional statements in backend/performance/causal_optimizer.py",
       "Use of loose equality in backend/performance/causal_optimizer.py",
+      "Use of var instead of let/const in backend/performance/distributed_causal_computing.py",
+      "Use of loose equality in backend/performance/distributed_causal_computing.py",
       "Use of loose equality in backend/research/automated_research_system.py",
       "Use of var instead of let/const in backend/research/novel_algorithms.py",
       "Use of loose equality in backend/research/novel_algorithms.py",
+      "Use of var instead of let/const in backend/research/novel_causal_discovery.py",
+      "Use of loose equality in backend/research/novel_causal_discovery.py",
       "Use of loose equality in backend/security/causal_security.py",
       "Use of loose equality in backend/api/routes/agents.py",
       "Use of loose equality in backend/api/routes/experiments.py"
     ],
     "metrics": {
-      "typescript": 15852,
-      "python": 16226,
-      "total": 32078,
+      "typescript": 17696,
+      "python": 203451,
+      "total": 221147,
       "test_coverage": 100
     },
     "recommendations": [
@@ -145,10 +161,10 @@
     "status": "pass",
     "score": 88,
     "issues": [
-      "Low code documentation ratio: 46.4%"
+      "Low code documentation ratio: 47.1%"
     ],
     "missing_docs": [],
-    "code_doc_ratio": 0.4642857142857143
+    "code_doc_ratio": 0.47058823529411764
   },
   "build_integrity": {
     "status": "pass",
@@ -159,12 +175,14 @@
   },
   "overall": {
     "status": "warning",
-    "score": 77.6,
+    "score": 76.1,
     "failed_checks": [
       "code_quality"
     ],
-    "warning_checks": [],
-    "total_issues": 91
+    "warning_checks": [
+      "performance"
+    ],
+    "total_issues": 107
   },
-  "execution_time": 2.966488
+  "execution_time": 3.265393
 }
