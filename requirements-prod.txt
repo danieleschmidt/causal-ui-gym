@@ -70,7 +70,7 @@ asyncpg==0.30.0
 psutil==5.9.6
 
 # Process Management
-supervisor==4.2.5
+supervisor==4.3.0
 
 # Background Tasks
 celery[redis]==5.3.4
