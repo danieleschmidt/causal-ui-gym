@@ -106,7 +106,7 @@ openpyxl==3.1.5
 dnspython==2.4.2
 
 # SSL/TLS
-certifi==2023.11.17
+certifi==2025.8.3
 
 # Production WSGI/ASGI
 gevent==25.5.1
