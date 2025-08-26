@@ -115,7 +115,7 @@ gevent==25.5.1
 memory-profiler==0.61.0
 
 # Performance Monitoring
-py-spy==0.3.14
+py-spy==0.4.1
 
 # Health Checks
 healthcheck==1.3.3
