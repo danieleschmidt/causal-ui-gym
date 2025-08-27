@@ -67,7 +67,7 @@ asyncio-mqtt==0.16.1
 asyncpg==0.30.0
 
 # System Monitoring
-psutil==5.9.6
+psutil==7.0.0
 
 # Process Management
 supervisor==4.3.0
