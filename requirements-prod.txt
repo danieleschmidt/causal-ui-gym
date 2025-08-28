@@ -17,7 +17,7 @@ sqlalchemy==2.0.42
 
 # Caching
 redis==6.4.0
-hiredis==2.2.3
+hiredis==3.2.1
 
 # Scientific Computing
 numpy==1.26.4
