@@ -73,7 +73,7 @@ psutil==7.0.0
 supervisor==4.3.0
 
 # Background Tasks
-celery[redis]==5.3.4
+celery[redis]==5.5.3
 kombu==5.5.4
 
 # Rate Limiting
