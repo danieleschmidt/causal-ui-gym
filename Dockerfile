@@ -2,7 +2,7 @@
 # Optimized for security, performance, and container scanning compliance
 
 # Stage 1: Frontend Build
-FROM node:24-alpine AS frontend-builder
+FROM node:25-alpine AS frontend-builder
 
 # Install security updates
 RUN apk update && apk upgrade && apk add --no-cache dumb-init
